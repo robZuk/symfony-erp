@@ -1,0 +1,44 @@
+{% extends 'layout.html.twig' %}
+
+{% set heading = partner.id ? 'Edycja kontrahenta' : 'Nowy kontrahent' %}
+
+{% block title %}{{ heading }} – Mini-ERP{% endblock %}
+{% block heading %}{{ heading }}{% endblock %}
+
+{% block page %}
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Content>
+            {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                {{ form_errors(form) }}
+
+                <div class="grid gap-6 sm:grid-cols-3">
+                    <div class="sm:col-span-2">{{ form_row(form.name) }}</div>
+                    {{ form_row(form.nip) }}
+                </div>
+                <div class="flex gap-6">
+                    {{ form_row(form.customer) }}
+                    {{ form_row(form.supplier) }}
+                </div>
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.email) }}
+                    {{ form_row(form.phone) }}
+                </div>
+
+                <fieldset class="grid gap-6">
+                    <legend class="mb-4 text-sm font-semibold">Adres</legend>
+                    {{ form_row(form.address.street) }}
+                    <div class="grid gap-6 sm:grid-cols-3">
+                        {{ form_row(form.address.postalCode) }}
+                        {{ form_row(form.address.city) }}
+                        {{ form_row(form.address.countryCode) }}
+                    </div>
+                </fieldset>
+
+                <div class="flex justify-end gap-2">
+                    <twig:Button as="a" variant="outline" href="{{ path('partner_index') }}">Anuluj</twig:Button>
+                    <twig:Button type="submit">Zapisz</twig:Button>
+                </div>
+            {{ form_end(form) }}
+        </twig:Card:Content>
+    </twig:Card>
+{% endblock %}

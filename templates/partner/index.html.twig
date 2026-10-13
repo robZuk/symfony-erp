@@ -1,0 +1,84 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Kontrahenci – Mini-ERP{% endblock %}
+{% block heading %}Kontrahenci{% endblock %}
+
+{% block page %}
+    <div class="flex flex-wrap items-end justify-between gap-2">
+        <form method="get" action="{{ path('partner_index') }}" class="flex flex-wrap items-end gap-2" role="search">
+            <twig:Input type="search" name="q" value="{{ filter.q }}" placeholder="Szukaj po nazwie, NIP lub mieście" aria-label="Szukaj" class="w-64" />
+            <twig:NativeSelect size="sm" name="role" aria-label="Typ">
+                <option value="all"{{ filter.role == 'all' ? ' selected' }}>Wszyscy</option>
+                <option value="customer"{{ filter.role == 'customer' ? ' selected' }}>Odbiorcy</option>
+                <option value="supplier"{{ filter.role == 'supplier' ? ' selected' }}>Dostawcy</option>
+            </twig:NativeSelect>
+            <twig:NativeSelect size="sm" name="status" aria-label="Status">
+                <option value="active"{{ filter.status == 'active' ? ' selected' }}>Aktywni</option>
+                <option value="inactive"{{ filter.status == 'inactive' ? ' selected' }}>Zarchiwizowani</option>
+                <option value="all"{{ filter.status == 'all' ? ' selected' }}>Wszyscy</option>
+            </twig:NativeSelect>
+            <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
+        </form>
+
+        {% if is_granted('ROLE_PARTNER_EDIT') %}
+            <twig:Button as="a" href="{{ path('partner_new') }}">
+                <twig:ux:icon name="lucide:plus" data-icon="inline-start" aria-hidden="true" />
+                Dodaj kontrahenta
+            </twig:Button>
+        {% endif %}
+    </div>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head>Nazwa</twig:Table:Head>
+                    <twig:Table:Head>NIP</twig:Table:Head>
+                    <twig:Table:Head>Miejscowość</twig:Table:Head>
+                    <twig:Table:Head>Typ</twig:Table:Head>
+                    <twig:Table:Head>Status</twig:Table:Head>
+                    <twig:Table:Head><span class="sr-only">Akcje</span></twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for partner in page.items %}
+                    <twig:Table:Row data-test="partner-row">
+                        <twig:Table:Cell class="font-medium">{{ partner.name }}</twig:Table:Cell>
+                        <twig:Table:Cell class="font-mono">{{ partner.nip ?? '—' }}</twig:Table:Cell>
+                        <twig:Table:Cell>{{ partner.address.city }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            <div class="flex gap-1">
+                                {% if partner.customer %}<twig:Badge variant="secondary">Odbiorca</twig:Badge>{% endif %}
+                                {% if partner.supplier %}<twig:Badge variant="secondary">Dostawca</twig:Badge>{% endif %}
+                            </div>
+                        </twig:Table:Cell>
+                        <twig:Table:Cell>
+                            {% if partner.active %}
+                                <twig:Badge variant="secondary">Aktywny</twig:Badge>
+                            {% else %}
+                                <twig:Badge variant="outline">Zarchiwizowany</twig:Badge>
+                            {% endif %}
+                        </twig:Table:Cell>
+                        <twig:Table:Cell>
+                            {% if is_granted('ROLE_PARTNER_EDIT') %}
+                                <div class="flex justify-end gap-1">
+                                    <twig:Button as="a" variant="ghost" size="sm" href="{{ path('partner_edit', {id: partner.id}) }}">Edytuj</twig:Button>
+                                    <form method="post" action="{{ path('partner_toggle', {id: partner.id}) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('partner_toggle') }}">
+                                        <twig:Button type="submit" variant="ghost" size="sm">{{ partner.active ? 'Archiwizuj' : 'Przywróć' }}</twig:Button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="6" class="h-24 text-center text-muted-foreground">Brak kontrahentów spełniających kryteria.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <twig:Pager :page="page" route="partner_index" :query="filter.toQuery()" />
+{% endblock %}

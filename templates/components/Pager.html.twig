@@ -1,0 +1,44 @@
+{#- Page links for a list. Not part of the Shadcn kit: it adapts App\Shared\Pagination\Page to the Pagination components. -#}
+{%- props
+    ## App\Shared\Pagination\Page The page being displayed.
+    page,
+    ## string Route of the list.
+    route,
+    ## array Query parameters (filters) to keep in every link.
+    query = {}
+-%}
+{%- set last = page.pageCount -%}
+<div {{ attributes.defaults({class: 'flex flex-wrap items-center justify-between gap-2'}) }}>
+    <p class="text-sm text-muted-foreground" data-test="pager-summary">
+        {%- if page.total > 0 -%}
+            {{ page.firstItemNumber }}–{{ page.lastItemNumber }} z {{ page.total }}
+        {%- else -%}
+            Brak wyników
+        {%- endif -%}
+    </p>
+    {%- if last > 1 -%}
+        <twig:Pagination class="mx-0 w-auto">
+            <twig:Pagination:Content>
+                {%- if page.hasPrevious -%}
+                    <twig:Pagination:Item>
+                        <twig:Pagination:Previous href="{{ path(route, query|merge({page: page.number - 1})) }}" />
+                    </twig:Pagination:Item>
+                {%- endif -%}
+                {%- for number in 1..last -%}
+                    {%- if number == 1 or number == last or (number - page.number)|abs <= 2 -%}
+                        <twig:Pagination:Item>
+                            <twig:Pagination:Link href="{{ path(route, query|merge({page: number})) }}" active="{{ number == page.number }}">{{ number }}</twig:Pagination:Link>
+                        </twig:Pagination:Item>
+                    {%- elseif (number - page.number)|abs == 3 -%}
+                        <twig:Pagination:Item><twig:Pagination:Ellipsis /></twig:Pagination:Item>
+                    {%- endif -%}
+                {%- endfor -%}
+                {%- if page.hasNext -%}
+                    <twig:Pagination:Item>
+                        <twig:Pagination:Next href="{{ path(route, query|merge({page: page.number + 1})) }}" />
+                    </twig:Pagination:Item>
+                {%- endif -%}
+            </twig:Pagination:Content>
+        </twig:Pagination>
+    {%- endif -%}
+</div>

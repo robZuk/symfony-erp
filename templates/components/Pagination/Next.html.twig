@@ -1,0 +1,12 @@
+{%- props
+    ## string The label text.
+    text = 'Następna'
+-%}
+<twig:Pagination:Link
+    aria-label="Następna strona"
+    size="default"
+    {{ ...attributes.defaults({class: 'pe-1.5!'|tailwind_classes}) }}
+>
+    <span class="hidden sm:block">{{ text }}</span>
+    <twig:ux:icon name="lucide:chevron-right" data-icon="inline-end" class="rtl:rotate-180" />
+</twig:Pagination:Link>

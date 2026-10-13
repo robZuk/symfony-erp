@@ -32,6 +32,18 @@
                                     <span>Pulpit</span>
                                 </twig:Sidebar:MenuButton>
                             </twig:Sidebar:MenuItem>
+                            <twig:Sidebar:MenuItem>
+                                <twig:Sidebar:MenuButton as="a" href="{{ path('catalog_product_index') }}" active="{{ current_route starts with 'catalog_product_' }}">
+                                    <twig:ux:icon name="lucide:package-search" aria-hidden="true" />
+                                    <span>Produkty</span>
+                                </twig:Sidebar:MenuButton>
+                            </twig:Sidebar:MenuItem>
+                            <twig:Sidebar:MenuItem>
+                                <twig:Sidebar:MenuButton as="a" href="{{ path('partner_index') }}" active="{{ current_route starts with 'partner_' }}">
+                                    <twig:ux:icon name="lucide:building-2" aria-hidden="true" />
+                                    <span>Kontrahenci</span>
+                                </twig:Sidebar:MenuButton>
+                            </twig:Sidebar:MenuItem>
                         </twig:Sidebar:Menu>
                     </twig:Sidebar:GroupContent>
                 </twig:Sidebar:Group>
@@ -56,14 +68,16 @@
 
         <twig:Sidebar:Inset>
             <header class="flex h-14 items-center gap-2 border-b px-4">
-                <twig:Sidebar:Trigger />
+                <twig:Sidebar:Trigger aria-label="Pokaż lub ukryj menu">
+                    <twig:ux:icon name="lucide:panel-left" aria-hidden="true" />
+                </twig:Sidebar:Trigger>
                 <h1 class="text-base font-semibold">{{ heading_html|raw }}</h1>
             </header>
 
             <main class="flex flex-1 flex-col gap-4 p-4">
                 {% for type, messages in app.flashes %}
                     {% for message in messages %}
-                        <twig:Alert variant="{{ type == 'error' ? 'destructive' : 'default' }}">
+                        <twig:Alert variant="{{ type == 'error' ? 'destructive' : 'default' }}" data-test="flash">
                             <twig:Alert:Description>{{ message }}</twig:Alert:Description>
                         </twig:Alert>
                     {% endfor %}

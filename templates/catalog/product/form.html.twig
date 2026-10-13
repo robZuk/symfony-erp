@@ -1,0 +1,32 @@
+{% extends 'layout.html.twig' %}
+
+{% set heading = product.id ? 'Edycja produktu' : 'Nowy produkt' %}
+
+{% block title %}{{ heading }} – Mini-ERP{% endblock %}
+{% block heading %}{{ heading }}{% endblock %}
+
+{% block page %}
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Content>
+            {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                {{ form_errors(form) }}
+
+                <div class="grid gap-6 sm:grid-cols-3">
+                    {{ form_row(form.sku) }}
+                    <div class="sm:col-span-2">{{ form_row(form.name) }}</div>
+                </div>
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.kind) }}
+                    {{ form_row(form.unit) }}
+                    {{ form_row(form.netPrice) }}
+                    {{ form_row(form.vatRate) }}
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <twig:Button as="a" variant="outline" href="{{ path('catalog_product_index') }}">Anuluj</twig:Button>
+                    <twig:Button type="submit">Zapisz</twig:Button>
+                </div>
+            {{ form_end(form) }}
+        </twig:Card:Content>
+    </twig:Card>
+{% endblock %}

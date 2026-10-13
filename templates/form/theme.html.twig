@@ -1,0 +1,107 @@
+{# Symfony form theme built on the Shadcn components from templates/components. #}
+{% use 'form_div_layout.html.twig' %}
+
+{%- block form_row -%}
+    {# content-start keeps label and field together when a neighbouring cell is taller #}
+    <twig:Form:Item class="content-start">
+        {{- form_label(form) -}}
+        {{- form_widget(form, help is empty ? {} : {attr: {'aria-describedby': id ~ '_help'}}) -}}
+        {{- form_help(form) -}}
+        {{- form_errors(form) -}}
+    </twig:Form:Item>
+{%- endblock form_row -%}
+
+{%- block form_label -%}
+    {%- if label is not same as(false) -%}
+        <twig:Form:Label for="{{ id }}">{{ label is empty ? name|humanize : label }}</twig:Form:Label>
+    {%- endif -%}
+{%- endblock form_label -%}
+
+{%- block form_widget_simple -%}
+    <twig:Input
+        type="{{ type|default('text') }}"
+        id="{{ id }}"
+        name="{{ full_name }}"
+        :value="value is empty ? false : value"
+        :required="required"
+        :disabled="disabled"
+        :aria-invalid="valid ? false : 'true'"
+        {{ ...attr }}
+    />
+{%- endblock form_widget_simple -%}
+
+{%- block money_widget -%}
+    <div class="flex items-center gap-2">
+        {{- block('form_widget_simple') -}}
+        <span class="text-sm text-muted-foreground">{{ money_pattern|replace({'{{ widget }}': ''})|trim }}</span>
+    </div>
+{%- endblock money_widget -%}
+
+{%- block choice_widget_collapsed -%}
+    <twig:NativeSelect
+        class="w-full"
+        size="sm"
+        id="{{ id }}"
+        name="{{ full_name }}"
+        :required="required"
+        :disabled="disabled"
+        :aria-invalid="valid ? false : 'true'"
+        {{ ...attr }}
+    >
+        {%- if placeholder is not none -%}
+            <option value=""{% if value is empty %} selected{% endif %}>{{ placeholder }}</option>
+        {%- endif -%}
+        {%- for choice in preferred_choices -%}
+            <option value="{{ choice.value }}"{% if choice is selectedchoice(value) %} selected{% endif %}>{{ choice.label }}</option>
+        {%- endfor -%}
+        {%- if preferred_choices is not empty -%}
+            <option disabled>──────────</option>
+        {%- endif -%}
+        {%- for choice in choices -%}
+            <option value="{{ choice.value }}"{% if preferred_choices is empty and choice is selectedchoice(value) %} selected{% endif %}>{{ choice.label }}</option>
+        {%- endfor -%}
+    </twig:NativeSelect>
+{%- endblock choice_widget_collapsed -%}
+
+{%- block checkbox_row -%}
+    <div class="grid gap-2">
+        <div class="flex items-center gap-2">
+            {{- form_widget(form) -}}
+            <label for="{{ id }}" class="text-sm font-medium leading-none select-none">{{ label is empty ? name|humanize : label }}</label>
+        </div>
+        {{- form_errors(form) -}}
+    </div>
+{%- endblock checkbox_row -%}
+
+{%- block checkbox_widget -%}
+    <twig:Checkbox
+        id="{{ id }}"
+        name="{{ full_name }}"
+        :value="value is defined ? value : false"
+        :checked="checked"
+        :disabled="disabled"
+        {{ ...attr }}
+    />
+{%- endblock checkbox_widget -%}
+
+{%- block form_help -%}
+    {%- if help is not empty -%}
+        <twig:Form:Description id="{{ id }}_help">{{ help }}</twig:Form:Description>
+    {%- endif -%}
+{%- endblock form_help -%}
+
+{%- block form_errors -%}
+    {%- if errors|length > 0 -%}
+        {%- if form is rootform -%}
+            <twig:Alert variant="destructive">
+                <twig:Alert:Description>
+                    {%- for error in errors -%}<p>{{ error.message }}</p>{%- endfor -%}
+                </twig:Alert:Description>
+            </twig:Alert>
+        {%- else -%}
+            {%- for error in errors -%}
+                <twig:Form:Message>{{ error.message }}</twig:Form:Message>
+            {%- endfor -%}
+        {%- endif -%}
+    {%- endif -%}
+{%- endblock form_errors -%}
