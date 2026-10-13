@@ -100,6 +100,20 @@ final class ImpersonationTest extends WebTestCase
         self::assertSelectorNotExists('[data-test="impersonation-banner"]');
     }
 
+    public function testSwitchingLinksAreNeverFetchedOnHover(): void
+    {
+        $this->signInAs($this->client, User::ROLE_ADMIN);
+
+        // Turbo fetches links when the pointer moves over them. A link that switches the user must opt out,
+        // or hovering it would quietly turn the administrator into somebody else.
+        $crawler = $this->client->request('GET', '/admin/users?q=anna');
+        self::assertSame('false', $crawler->selectLink('Podszywaj się')->attr('data-turbo-prefetch'));
+
+        $crawler = $this->client->request('GET', '/?_switch_user=anna@example.com');
+        $crawler = $this->client->followRedirect();
+        self::assertSame('false', $crawler->selectLink('Wróć do swojego konta')->attr('data-turbo-prefetch'));
+    }
+
     public function testNoButtonForTheAdministratorsOwnRow(): void
     {
         $this->signInAs($this->client, User::ROLE_ADMIN);

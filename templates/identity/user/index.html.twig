@@ -63,9 +63,11 @@
                                 <div class="flex justify-end gap-1">
                                     <twig:Button as="a" variant="ghost" size="sm" href="{{ path('identity_user_edit', {id: user.id}) }}" title="Imię i nazwisko, role, nowe hasło">Role i dane</twig:Button>
                                     {# Not while already working as someone else, and never as a blocked account.
-                                        The link goes to the home page: this list is closed to everyone but administrators. #}
+                                        The link goes to the home page: this list is closed to everyone but administrators.
+                                        Turbo normally fetches a link as soon as the pointer is over it; for this one that
+                                        would switch the user on a mere hover, so prefetching is turned off. #}
                                     {% if user != app.user and user.active and not is_granted('IS_IMPERSONATOR') %}
-                                        <twig:Button as="a" variant="ghost" size="sm" href="{{ path('app_dashboard', {_switch_user: user.email}) }}" title="Zobacz system oczami tego użytkownika">Podszywaj się</twig:Button>
+                                        <twig:Button as="a" variant="ghost" size="sm" href="{{ path('app_dashboard', {_switch_user: user.email}) }}" data-turbo-prefetch="false" title="Zobacz system oczami tego użytkownika">Podszywaj się</twig:Button>
                                     {% endif %}
                                     {% if user != app.user %}
                                         <form method="post" action="{{ path('identity_user_toggle', {id: user.id}) }}">

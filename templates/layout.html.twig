@@ -169,7 +169,7 @@
                         <twig:ux:icon name="lucide:user-round-cog" class="size-4" aria-hidden="true" />
                         Pracujesz jako <strong>{{ app.user.fullName }}</strong>. Widzisz i możesz zrobić to, co ta osoba; dziennik zapisze Ciebie.
                     </span>
-                    <twig:Button as="a" variant="outline" size="sm" href="{{ impersonation_exit_path(path('identity_user_index')) }}">Wróć do swojego konta</twig:Button>
+                    <twig:Button as="a" variant="outline" size="sm" href="{{ impersonation_exit_path(path('identity_user_index')) }}" data-turbo-prefetch="false">Wróć do swojego konta</twig:Button>
                 </div>
             {% endif %}
 
