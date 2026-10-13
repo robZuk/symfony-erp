@@ -80,7 +80,7 @@ final class SessionLogger
             if ($administrator instanceof Actor && $target instanceof Actor) {
                 $this->activity->record(
                     'identity.session.impersonation_started',
-                    \sprintf('Rozpoczęto pracę jako %s.', $target->actorName()),
+                    \sprintf('Zalogowano jako %s.', $target->actorName()),
                     actor: $administrator,
                 );
             }
@@ -93,7 +93,7 @@ final class SessionLogger
         if ($target instanceof Actor && $impersonated instanceof Actor) {
             $this->activity->record(
                 'identity.session.impersonation_ended',
-                \sprintf('Zakończono pracę jako %s.', $impersonated->actorName()),
+                \sprintf('Wrócono z konta %s.', $impersonated->actorName()),
                 actor: $target,
             );
         }

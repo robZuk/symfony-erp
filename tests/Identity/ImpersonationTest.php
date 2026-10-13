@@ -29,11 +29,11 @@ final class ImpersonationTest extends WebTestCase
         $this->signInAs($this->client, User::ROLE_ADMIN);
 
         $crawler = $this->client->request('GET', '/admin/users?q=anna');
-        $this->client->click($crawler->selectLink('Pracuj jako')->link());
+        $this->client->click($crawler->selectLink('Zaloguj jako')->link());
         $crawler = $this->client->followRedirect();
 
         // The administrator now sees the system exactly as Anna does
-        self::assertSelectorTextContains('[data-test="impersonation-banner"]', 'Pracujesz jako Anna Nowak');
+        self::assertSelectorTextContains('[data-test="impersonation-banner"]', 'Jesteś zalogowany jako Anna Nowak');
         self::assertSelectorTextContains('[data-test="current-user"]', 'Anna Nowak');
         self::assertSelectorTextNotContains('[data-slot="sidebar"]', 'Administracja');
         $this->client->request('GET', '/sales/orders/new');
@@ -66,9 +66,9 @@ final class ImpersonationTest extends WebTestCase
             self::getContainer()->get(ActivityEntryRepository::class)->findBy(['actorId' => $admin->getId()], ['id' => 'ASC']),
         );
         self::assertSame([
-            'Test User: Rozpoczęto pracę jako Anna Nowak.',
+            'Test User: Zalogowano jako Anna Nowak.',
             'Test User (jako Anna Nowak): Zmieniono produkt KAB-1: cena netto: 34,90 zł → 39,90 zł.',
-            'Test User: Zakończono pracę jako Anna Nowak.',
+            'Test User: Wrócono z konta Anna Nowak.',
         ], $summaries);
     }
 
@@ -91,7 +91,7 @@ final class ImpersonationTest extends WebTestCase
 
         // No button on the list...
         $crawler = $this->client->request('GET', '/admin/users?q=anna');
-        self::assertCount(0, $crawler->selectLink('Pracuj jako'));
+        self::assertCount(0, $crawler->selectLink('Zaloguj jako'));
 
         // ...and the address typed by hand does not work either
         $this->client->request('GET', '/?_switch_user=anna@example.com');
@@ -108,6 +108,6 @@ final class ImpersonationTest extends WebTestCase
 
         // Two users are listed, one of them the administrator: exactly one can be impersonated
         self::assertSelectorCount(2, '[data-test="user-row"]');
-        self::assertCount(1, $crawler->selectLink('Pracuj jako'));
+        self::assertCount(1, $crawler->selectLink('Zaloguj jako'));
     }
 }
