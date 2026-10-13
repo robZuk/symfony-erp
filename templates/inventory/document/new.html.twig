@@ -1,0 +1,32 @@
+{% extends 'layout.html.twig' %}
+
+{% set heading = type.label ~ ' (' ~ type.value ~ ')' %}
+
+{% block title %}{{ heading }} – Mini-ERP{% endblock %}
+{% block heading %}{{ heading }}{% endblock %}
+
+{% block page %}
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Header>
+            <twig:Card:Description>Najpierw nagłówek dokumentu. Pozycje dodasz w następnym kroku.</twig:Card:Description>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                {{ form_errors(form) }}
+
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.warehouse) }}
+                    {% if form.targetWarehouse is defined %}{{ form_row(form.targetWarehouse) }}{% endif %}
+                    {% if form.partnerId is defined %}{{ form_row(form.partnerId) }}{% endif %}
+                    {{ form_row(form.documentDate) }}
+                </div>
+                {{ form_row(form.note) }}
+
+                <div class="flex justify-end gap-2">
+                    <twig:Button as="a" variant="outline" href="{{ path('inventory_document_index') }}">Anuluj</twig:Button>
+                    <twig:Button type="submit">Utwórz szkic</twig:Button>
+                </div>
+            {{ form_end(form) }}
+        </twig:Card:Content>
+    </twig:Card>
+{% endblock %}

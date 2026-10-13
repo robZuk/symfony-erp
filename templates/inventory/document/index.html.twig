@@ -1,0 +1,77 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Dokumenty magazynowe – Mini-ERP{% endblock %}
+{% block heading %}Dokumenty magazynowe{% endblock %}
+
+{% block page %}
+    <div class="flex flex-wrap items-end justify-between gap-2">
+        <form method="get" action="{{ path('inventory_document_index') }}" class="flex flex-wrap items-end gap-2" role="search">
+            <twig:Input type="search" name="q" value="{{ filter.q }}" placeholder="Szukaj po numerze" aria-label="Szukaj" class="w-48" />
+            <twig:NativeSelect size="sm" name="type" aria-label="Typ">
+                <option value="">Wszystkie typy</option>
+                {% for type in ['PZ', 'WZ', 'MM'] %}
+                    <option value="{{ type }}"{{ filter.type == type ? ' selected' }}>{{ type }}</option>
+                {% endfor %}
+            </twig:NativeSelect>
+            <twig:NativeSelect size="sm" name="status" aria-label="Status">
+                <option value="">Wszystkie statusy</option>
+                <option value="draft"{{ filter.status == 'draft' ? ' selected' }}>Szkice</option>
+                <option value="posted"{{ filter.status == 'posted' ? ' selected' }}>Zaksięgowane</option>
+            </twig:NativeSelect>
+            <twig:NativeSelect size="sm" name="warehouse" aria-label="Magazyn">
+                <option value="">Wszystkie magazyny</option>
+                {% for warehouse in warehouses %}
+                    <option value="{{ warehouse.id }}"{{ filter.warehouse == warehouse.id ? ' selected' }}>{{ warehouse.code }}</option>
+                {% endfor %}
+            </twig:NativeSelect>
+            <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
+        </form>
+
+        {% if is_granted('ROLE_INVENTORY_EDIT') %}
+            <div class="flex gap-2">
+                <twig:Button as="a" href="{{ path('inventory_document_new', {type: 'PZ'}) }}">Przyjęcie (PZ)</twig:Button>
+                <twig:Button as="a" variant="outline" href="{{ path('inventory_document_new', {type: 'WZ'}) }}">Wydanie (WZ)</twig:Button>
+                <twig:Button as="a" variant="outline" href="{{ path('inventory_document_new', {type: 'MM'}) }}">Przesunięcie (MM)</twig:Button>
+            </div>
+        {% endif %}
+    </div>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head>Numer</twig:Table:Head>
+                    <twig:Table:Head>Data</twig:Table:Head>
+                    <twig:Table:Head>Magazyn</twig:Table:Head>
+                    <twig:Table:Head>Kontrahent</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Pozycje</twig:Table:Head>
+                    <twig:Table:Head>Status</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for document in page.items %}
+                    <twig:Table:Row data-test="document-row">
+                        <twig:Table:Cell class="font-medium">
+                            <a href="{{ path('inventory_document_show', {id: document.id}) }}" class="underline-offset-4 hover:underline">{{ document.title }}</a>
+                        </twig:Table:Cell>
+                        <twig:Table:Cell>{{ document.documentDate|date('d.m.Y') }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            {{ document.warehouse.code }}{% if document.targetWarehouse %} → {{ document.targetWarehouse.code }}{% endif %}
+                        </twig:Table:Cell>
+                        <twig:Table:Cell>{{ partners[document.partnerId].name ?? '—' }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ document.lines|length }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            <twig:Badge variant="{{ document.draft ? 'outline' : 'secondary' }}">{{ document.status.label }}</twig:Badge>
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="6" class="h-24 text-center text-muted-foreground">Brak dokumentów spełniających kryteria.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <twig:Pager :page="page" route="inventory_document_index" :query="filter.toQuery()" />
+{% endblock %}

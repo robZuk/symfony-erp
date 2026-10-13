@@ -30,6 +30,17 @@
     />
 {%- endblock form_widget_simple -%}
 
+{%- block textarea_widget -%}
+    <twig:Textarea
+        id="{{ id }}"
+        name="{{ full_name }}"
+        :required="required"
+        :disabled="disabled"
+        :aria-invalid="valid ? false : 'true'"
+        {{ ...attr }}
+    >{{ value }}</twig:Textarea>
+{%- endblock textarea_widget -%}
+
 {%- block money_widget -%}
     <div class="flex items-center gap-2">
         {{- block('form_widget_simple') -}}

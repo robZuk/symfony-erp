@@ -1,0 +1,138 @@
+{% extends 'layout.html.twig' %}
+
+{% set can_edit = document.draft and is_granted('ROLE_INVENTORY_EDIT') %}
+
+{% block title %}{{ document.title }} – Mini-ERP{% endblock %}
+{% block heading %}{{ document.title }}{% endblock %}
+
+{% block page %}
+    <twig:Card>
+        <twig:Card:Header>
+            <twig:Card:Title class="flex items-center gap-2">
+                {{ document.type.label }}
+                <twig:Badge variant="{{ document.draft ? 'outline' : 'secondary' }}" data-test="document-status">{{ document.status.label }}</twig:Badge>
+            </twig:Card:Title>
+            {% if document.draft %}
+                <twig:Card:Description>Szkic nie zmienia stanów magazynowych. Zrobi to dopiero zaksięgowanie, którego nie da się cofnąć.</twig:Card:Description>
+            {% endif %}
+        </twig:Card:Header>
+        <twig:Card:Content>
+            <dl class="grid gap-4 text-sm sm:grid-cols-4">
+                <div>
+                    <dt class="text-muted-foreground">{{ document.targetWarehouse ? 'Z magazynu' : 'Magazyn' }}</dt>
+                    <dd class="font-medium">{{ document.warehouse.label }}</dd>
+                </div>
+                {% if document.targetWarehouse %}
+                    <div>
+                        <dt class="text-muted-foreground">Do magazynu</dt>
+                        <dd class="font-medium">{{ document.targetWarehouse.label }}</dd>
+                    </div>
+                {% endif %}
+                {% if partner %}
+                    <div>
+                        <dt class="text-muted-foreground">Kontrahent</dt>
+                        <dd class="font-medium">{{ partner.name }}</dd>
+                    </div>
+                {% endif %}
+                <div>
+                    <dt class="text-muted-foreground">Data dokumentu</dt>
+                    <dd class="font-medium">{{ document.documentDate|date('d.m.Y') }}</dd>
+                </div>
+                {% if document.postedAt %}
+                    <div>
+                        <dt class="text-muted-foreground">Zaksięgowano</dt>
+                        <dd class="font-medium">{{ document.postedAt|date('d.m.Y H:i') }}</dd>
+                    </div>
+                {% endif %}
+                {% if document.note %}
+                    <div class="sm:col-span-4">
+                        <dt class="text-muted-foreground">Uwagi</dt>
+                        <dd class="whitespace-pre-line">{{ document.note }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+        </twig:Card:Content>
+    </twig:Card>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head class="w-12">Lp.</twig:Table:Head>
+                    <twig:Table:Head>Indeks</twig:Table:Head>
+                    <twig:Table:Head>Nazwa</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Ilość</twig:Table:Head>
+                    <twig:Table:Head>J.m.</twig:Table:Head>
+                    <twig:Table:Head><span class="sr-only">Akcje</span></twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for line in document.lines %}
+                    {% set product = products[line.productId] ?? null %}
+                    {# "loop" is not visible inside components, so the position is copied to a variable #}
+                    {% set position = loop.index %}
+                    <twig:Table:Row data-test="line-row">
+                        <twig:Table:Cell>{{ position }}</twig:Table:Cell>
+                        <twig:Table:Cell class="font-mono">
+                            <a href="{{ path('inventory_stock_product', {productId: line.productId}) }}" class="underline-offset-4 hover:underline" data-test="line-sku">{{ product.sku ?? ('#' ~ line.productId) }}</a>
+                        </twig:Table:Cell>
+                        <twig:Table:Cell class="font-medium">{{ product.name ?? '—' }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ line.quantity|quantity }}</twig:Table:Cell>
+                        <twig:Table:Cell>{{ product.unit ?? '' }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            {% if can_edit %}
+                                <form method="post" action="{{ path('inventory_document_remove_line', {id: document.id, lineId: line.id}) }}" class="flex justify-end">
+                                    <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
+                                    <twig:Button type="submit" variant="ghost" size="sm">Usuń pozycję</twig:Button>
+                                </form>
+                            {% endif %}
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="6" class="h-24 text-center text-muted-foreground">Dokument nie ma jeszcze pozycji.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    {% if can_edit %}
+        <twig:Card>
+            <twig:Card:Header>
+                <twig:Card:Title>Dodaj pozycję</twig:Card:Title>
+            </twig:Card:Header>
+            <twig:Card:Content>
+                {{ form_start(line_form, {action: path('inventory_document_add_line', {id: document.id}), attr: {class: 'grid items-start gap-4 sm:grid-cols-[1fr_10rem_auto]', novalidate: 'novalidate'}}) }}
+                    {{ form_row(line_form.productId) }}
+                    {{ form_row(line_form.quantity) }}
+                    {# Invisible label keeps the button level with the fields #}
+                    <div class="grid gap-2">
+                        <span class="text-sm leading-none" aria-hidden="true">&nbsp;</span>
+                        <twig:Button type="submit" variant="outline">Dodaj pozycję</twig:Button>
+                    </div>
+                {{ form_end(line_form) }}
+            </twig:Card:Content>
+        </twig:Card>
+    {% endif %}
+
+    {% if is_granted('ROLE_INVENTORY_EDIT') %}
+        <div class="flex flex-wrap justify-end gap-2">
+            {% if document.draft %}
+                <form method="post" action="{{ path('inventory_document_delete', {id: document.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
+                    <twig:Button type="submit" variant="destructive">Usuń szkic</twig:Button>
+                </form>
+                <form method="post" action="{{ path('inventory_document_post', {id: document.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
+                    <twig:Button type="submit">Zaksięguj</twig:Button>
+                </form>
+            {% else %}
+                <form method="post" action="{{ path('inventory_document_correct', {id: document.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
+                    <twig:Button type="submit" variant="outline">Utwórz korektę</twig:Button>
+                </form>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

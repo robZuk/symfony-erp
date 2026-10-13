@@ -1,0 +1,76 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}{{ product.sku }} – stany – Mini-ERP{% endblock %}
+{% block heading %}{{ product.sku }} · {{ product.name }}{% endblock %}
+
+{% block page %}
+    {% if not product.stockKept %}
+        <twig:Alert>
+            <twig:Alert:Description>To usługa, więc nie ma stanów magazynowych.</twig:Alert:Description>
+        </twig:Alert>
+    {% endif %}
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head>Magazyn</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Stan</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Zarezerwowane</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Dostępne</twig:Table:Head>
+                    <twig:Table:Head>J.m.</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for level in levels %}
+                    <twig:Table:Row data-test="level-row">
+                        <twig:Table:Cell>{{ level.warehouse.label }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ level.quantity|quantity }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ level.reserved|quantity }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end font-medium tabular-nums">{{ level.available|quantity }}</twig:Table:Cell>
+                        <twig:Table:Cell>{{ product.unit }}</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="5" class="h-16 text-center text-muted-foreground">Tego produktu nie było jeszcze w żadnym magazynie.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <h2 class="text-sm font-semibold">Historia ruchów</h2>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head>Kiedy</twig:Table:Head>
+                    <twig:Table:Head>Dokument</twig:Table:Head>
+                    <twig:Table:Head>Magazyn</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Zmiana</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for movement in page.items %}
+                    <twig:Table:Row data-test="movement-row">
+                        <twig:Table:Cell>{{ movement.occurredAt|date('d.m.Y H:i') }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            <a href="{{ path('inventory_document_show', {id: movement.document.id}) }}" class="underline-offset-4 hover:underline">{{ movement.document.title }}</a>
+                        </twig:Table:Cell>
+                        <twig:Table:Cell class="font-mono">{{ movement.warehouse.code }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums {{ movement.quantity < 0 ? 'text-destructive' }}">
+                            {{- movement.quantity > 0 ? '+' }}{{ movement.quantity|quantity -}}
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="4" class="h-16 text-center text-muted-foreground">Brak ruchów.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <twig:Pager :page="page" route="inventory_stock_product" :query="{productId: product.id}" />
+{% endblock %}

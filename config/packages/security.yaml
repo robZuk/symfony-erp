@@ -35,7 +35,7 @@ security:
     # Job roles are assigned to users; the *_EDIT permissions are what the code checks.
     role_hierarchy:
         ROLE_ADMIN: [ROLE_WAREHOUSE, ROLE_SALES, ROLE_ACCOUNTING]
-        ROLE_WAREHOUSE: [ROLE_CATALOG_EDIT]
+        ROLE_WAREHOUSE: [ROLE_CATALOG_EDIT, ROLE_INVENTORY_EDIT]
         ROLE_SALES: [ROLE_CATALOG_EDIT, ROLE_PARTNER_EDIT]
         ROLE_ACCOUNTING: [ROLE_PARTNER_EDIT]
 

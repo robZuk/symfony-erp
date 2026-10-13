@@ -1,0 +1,59 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Magazyny – Mini-ERP{% endblock %}
+{% block heading %}Magazyny{% endblock %}
+
+{% block page %}
+    {% if is_granted('ROLE_INVENTORY_EDIT') %}
+        <div class="flex justify-end">
+            <twig:Button as="a" href="{{ path('inventory_warehouse_new') }}">
+                <twig:ux:icon name="lucide:plus" data-icon="inline-start" aria-hidden="true" />
+                Dodaj magazyn
+            </twig:Button>
+        </div>
+    {% endif %}
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head>Kod</twig:Table:Head>
+                    <twig:Table:Head>Nazwa</twig:Table:Head>
+                    <twig:Table:Head>Status</twig:Table:Head>
+                    <twig:Table:Head><span class="sr-only">Akcje</span></twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for warehouse in warehouses %}
+                    <twig:Table:Row data-test="warehouse-row">
+                        <twig:Table:Cell class="font-mono">{{ warehouse.code }}</twig:Table:Cell>
+                        <twig:Table:Cell class="font-medium">{{ warehouse.name }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            {% if warehouse.active %}
+                                <twig:Badge variant="secondary">Czynny</twig:Badge>
+                            {% else %}
+                                <twig:Badge variant="outline">Zamknięty</twig:Badge>
+                            {% endif %}
+                        </twig:Table:Cell>
+                        <twig:Table:Cell>
+                            <div class="flex justify-end gap-1">
+                                <twig:Button as="a" variant="ghost" size="sm" href="{{ path('inventory_stock_index', {warehouse: warehouse.id}) }}">Stany</twig:Button>
+                                {% if is_granted('ROLE_INVENTORY_EDIT') %}
+                                    <twig:Button as="a" variant="ghost" size="sm" href="{{ path('inventory_warehouse_edit', {id: warehouse.id}) }}">Edytuj</twig:Button>
+                                    <form method="post" action="{{ path('inventory_warehouse_toggle', {id: warehouse.id}) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('inventory_warehouse_toggle') }}">
+                                        <twig:Button type="submit" variant="ghost" size="sm">{{ warehouse.active ? 'Zamknij' : 'Otwórz' }}</twig:Button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="4" class="h-24 text-center text-muted-foreground">Nie ma jeszcze żadnego magazynu.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+{% endblock %}

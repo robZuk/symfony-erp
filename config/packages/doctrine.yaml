@@ -15,6 +15,11 @@ doctrine:
         auto_mapping: true
         # One mapping per module: entities live in src/<Module>/Entity
         mappings:
+            Shared:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Shared/Entity'
+                prefix: 'App\Shared\Entity'
             Identity:
                 type: attribute
                 is_bundle: false
