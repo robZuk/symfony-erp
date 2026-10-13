@@ -33,7 +33,7 @@ final class ImpersonationTest extends WebTestCase
         $crawler = $this->client->followRedirect();
 
         // The administrator now sees the system exactly as Anna does
-        self::assertSelectorTextContains('[data-test="impersonation-banner"]', 'Jesteś zalogowany jako Anna Nowak');
+        self::assertSelectorTextContains('[data-test="impersonation-banner"]', 'Pracujesz jako Anna Nowak');
         self::assertSelectorTextContains('[data-test="current-user"]', 'Anna Nowak');
         self::assertSelectorTextNotContains('[data-slot="sidebar"]', 'Administracja');
         $this->client->request('GET', '/sales/orders/new');
@@ -66,9 +66,9 @@ final class ImpersonationTest extends WebTestCase
             self::getContainer()->get(ActivityEntryRepository::class)->findBy(['actorId' => $admin->getId()], ['id' => 'ASC']),
         );
         self::assertSame([
-            'Test User: Zalogowano jako Anna Nowak.',
+            'Test User: Rozpoczęto pracę jako Anna Nowak.',
             'Test User (jako Anna Nowak): Zmieniono produkt KAB-1: cena netto: 34,90 zł → 39,90 zł.',
-            'Test User: Wrócono z konta Anna Nowak.',
+            'Test User: Zakończono pracę jako Anna Nowak.',
         ], $summaries);
     }
 
