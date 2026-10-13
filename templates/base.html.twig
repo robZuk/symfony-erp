@@ -5,6 +5,17 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{% block title %}Mini-ERP{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.1em%22 font-size=%2296%22>📦</text></svg>">
+        {# Applies the saved or system colour theme before the first paint, so the page never flashes the wrong one #}
+        <script>
+            (function () {
+                try {
+                    var saved = localStorage.getItem('theme');
+                    if ('dark' === saved || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                        document.documentElement.classList.add('dark');
+                    }
+                } catch (e) {}
+            })();
+        </script>
         {% block stylesheets %}
             <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
         {% endblock %}

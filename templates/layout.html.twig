@@ -1,7 +1,5 @@
 {% extends 'base.html.twig' %}
 
-{% set current_route = app.request.attributes.get('_route') %}
-
 {# Pages fill these two blocks. They are captured here because a block cannot be
    declared inside a <twig:...> component: there it would belong to the component. #}
 {% block heading %}{% endblock %}
@@ -10,109 +8,147 @@
 {% block body %}
     {% set heading_html = block('heading') %}
     {% set page_html = block('page') %}
+    {% set current_route = app.request.attributes.get('_route') %}
+
+    {# The menu, grouped as in the sidebar. "match" is the route-name prefix that marks an entry as current. #}
+    {% set navigation = [
+        {label: null, items: [
+            {label: 'Pulpit', route: 'app_dashboard', match: 'app_dashboard', icon: 'lucide:layout-dashboard'},
+        ]},
+        {label: 'Kartoteki', items: [
+            {label: 'Produkty', route: 'catalog_product_index', match: 'catalog_product_', icon: 'lucide:package-search'},
+            {label: 'Kontrahenci', route: 'partner_index', match: 'partner_', icon: 'lucide:building-2'},
+        ]},
+        {label: 'Sprzedaż', items: [
+            {label: 'Zamówienia', route: 'sales_order_index', match: 'sales_order_', icon: 'lucide:shopping-cart'},
+        ]},
+        {label: 'Magazyn', items: [
+            {label: 'Dokumenty', route: 'inventory_document_index', match: 'inventory_document_', icon: 'lucide:file-text'},
+            {label: 'Stany', route: 'inventory_stock_index', match: 'inventory_stock_', icon: 'lucide:boxes'},
+            {label: 'Magazyny', route: 'inventory_warehouse_index', match: 'inventory_warehouse_', icon: 'lucide:warehouse'},
+        ]},
+    ] %}
+
+    {# Section of the current page, shown as the first breadcrumb #}
+    {% set current_section = null %}
+    {% for group in navigation %}
+        {% for item in group.items %}
+            {% if current_route starts with item.match %}
+                {% set current_section = group.label %}
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+
+    {% set initials = app.user.fullName|split(' ')|filter(part => part is not empty)|slice(0, 2)|map(part => part|first|upper)|join %}
 
     <twig:Sidebar:Provider id="app-sidebar">
-        <twig:Sidebar>
+        <twig:Sidebar variant="inset" collapsible="icon">
             <twig:Sidebar:Header>
-                <a href="{{ path('app_dashboard') }}" class="flex items-center gap-2 p-2">
-                    <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                        <twig:ux:icon name="lucide:package" class="size-4" aria-hidden="true" />
-                    </div>
-                    <span class="font-semibold">Mini-ERP</span>
-                </a>
+                <twig:Sidebar:Menu>
+                    <twig:Sidebar:MenuItem>
+                        <twig:Sidebar:MenuButton as="a" href="{{ path('app_dashboard') }}" size="lg" tooltip="Mini-ERP">
+                            <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                                <twig:ux:icon name="lucide:package" class="size-4" aria-hidden="true" />
+                            </div>
+                            <div class="grid flex-1 text-start text-sm leading-tight">
+                                <span class="truncate font-semibold">Mini-ERP</span>
+                                <span class="truncate text-xs">Magazyn i sprzedaż</span>
+                            </div>
+                        </twig:Sidebar:MenuButton>
+                    </twig:Sidebar:MenuItem>
+                </twig:Sidebar:Menu>
             </twig:Sidebar:Header>
 
             <twig:Sidebar:Content>
-                <twig:Sidebar:Group>
-                    <twig:Sidebar:GroupContent>
-                        <twig:Sidebar:Menu>
-                            <twig:Sidebar:MenuItem>
-                                <twig:Sidebar:MenuButton as="a" href="{{ path('app_dashboard') }}" active="{{ current_route == 'app_dashboard' }}">
-                                    <twig:ux:icon name="lucide:layout-dashboard" aria-hidden="true" />
-                                    <span>Pulpit</span>
-                                </twig:Sidebar:MenuButton>
-                            </twig:Sidebar:MenuItem>
-                            <twig:Sidebar:MenuItem>
-                                <twig:Sidebar:MenuButton as="a" href="{{ path('catalog_product_index') }}" active="{{ current_route starts with 'catalog_product_' }}">
-                                    <twig:ux:icon name="lucide:package-search" aria-hidden="true" />
-                                    <span>Produkty</span>
-                                </twig:Sidebar:MenuButton>
-                            </twig:Sidebar:MenuItem>
-                            <twig:Sidebar:MenuItem>
-                                <twig:Sidebar:MenuButton as="a" href="{{ path('partner_index') }}" active="{{ current_route starts with 'partner_' }}">
-                                    <twig:ux:icon name="lucide:building-2" aria-hidden="true" />
-                                    <span>Kontrahenci</span>
-                                </twig:Sidebar:MenuButton>
-                            </twig:Sidebar:MenuItem>
-                        </twig:Sidebar:Menu>
-                    </twig:Sidebar:GroupContent>
-                </twig:Sidebar:Group>
-                <twig:Sidebar:Group>
-                    <twig:Sidebar:GroupLabel>Sprzedaż</twig:Sidebar:GroupLabel>
-                    <twig:Sidebar:GroupContent>
-                        <twig:Sidebar:Menu>
-                            <twig:Sidebar:MenuItem>
-                                <twig:Sidebar:MenuButton as="a" href="{{ path('sales_order_index') }}" active="{{ current_route starts with 'sales_order_' }}">
-                                    <twig:ux:icon name="lucide:shopping-cart" aria-hidden="true" />
-                                    <span>Zamówienia</span>
-                                </twig:Sidebar:MenuButton>
-                            </twig:Sidebar:MenuItem>
-                        </twig:Sidebar:Menu>
-                    </twig:Sidebar:GroupContent>
-                </twig:Sidebar:Group>
-                <twig:Sidebar:Group>
-                    <twig:Sidebar:GroupLabel>Magazyn</twig:Sidebar:GroupLabel>
-                    <twig:Sidebar:GroupContent>
-                        <twig:Sidebar:Menu>
-                            <twig:Sidebar:MenuItem>
-                                <twig:Sidebar:MenuButton as="a" href="{{ path('inventory_document_index') }}" active="{{ current_route starts with 'inventory_document_' }}">
-                                    <twig:ux:icon name="lucide:file-text" aria-hidden="true" />
-                                    <span>Dokumenty</span>
-                                </twig:Sidebar:MenuButton>
-                            </twig:Sidebar:MenuItem>
-                            <twig:Sidebar:MenuItem>
-                                <twig:Sidebar:MenuButton as="a" href="{{ path('inventory_stock_index') }}" active="{{ current_route starts with 'inventory_stock_' }}">
-                                    <twig:ux:icon name="lucide:boxes" aria-hidden="true" />
-                                    <span>Stany</span>
-                                </twig:Sidebar:MenuButton>
-                            </twig:Sidebar:MenuItem>
-                            <twig:Sidebar:MenuItem>
-                                <twig:Sidebar:MenuButton as="a" href="{{ path('inventory_warehouse_index') }}" active="{{ current_route starts with 'inventory_warehouse_' }}">
-                                    <twig:ux:icon name="lucide:warehouse" aria-hidden="true" />
-                                    <span>Magazyny</span>
-                                </twig:Sidebar:MenuButton>
-                            </twig:Sidebar:MenuItem>
-                        </twig:Sidebar:Menu>
-                    </twig:Sidebar:GroupContent>
-                </twig:Sidebar:Group>
+                {% for group in navigation %}
+                    <twig:Sidebar:Group>
+                        {% if group.label %}
+                            <twig:Sidebar:GroupLabel>{{ group.label }}</twig:Sidebar:GroupLabel>
+                        {% endif %}
+                        <twig:Sidebar:GroupContent>
+                            <twig:Sidebar:Menu>
+                                {% for item in group.items %}
+                                    <twig:Sidebar:MenuItem>
+                                        <twig:Sidebar:MenuButton as="a" href="{{ path(item.route) }}" tooltip="{{ item.label }}" active="{{ current_route starts with item.match }}">
+                                            <twig:ux:icon name="{{ item.icon }}" aria-hidden="true" />
+                                            <span>{{ item.label }}</span>
+                                        </twig:Sidebar:MenuButton>
+                                    </twig:Sidebar:MenuItem>
+                                {% endfor %}
+                            </twig:Sidebar:Menu>
+                        </twig:Sidebar:GroupContent>
+                    </twig:Sidebar:Group>
+                {% endfor %}
             </twig:Sidebar:Content>
 
             <twig:Sidebar:Footer>
-                <div class="flex items-center gap-2 p-2">
-                    <div class="grid flex-1 text-sm leading-tight">
-                        <span class="truncate font-semibold" data-test="current-user">{{ app.user.fullName }}</span>
-                        <span class="truncate text-xs text-muted-foreground">{{ app.user.email }}</span>
-                    </div>
-                    <form method="post" action="{{ path('app_logout') }}">
-                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
-                        <twig:Button type="submit" variant="ghost" size="icon" title="Wyloguj">
-                            <twig:ux:icon name="lucide:log-out" aria-hidden="true" />
-                            <span class="sr-only">Wyloguj</span>
-                        </twig:Button>
-                    </form>
-                </div>
+                <twig:Sidebar:Menu>
+                    <twig:Sidebar:MenuItem>
+                        <twig:DropdownMenu id="account" side="top" class="block w-full">
+                            <twig:DropdownMenu:Trigger>
+                                <twig:Sidebar:MenuButton {{ ...dropdown_menu_trigger_attrs }} size="lg" tooltip="{{ app.user.fullName }}">
+                                    <twig:Avatar class="rounded-lg after:rounded-lg">
+                                        <twig:Avatar:Fallback class="rounded-lg text-xs font-medium">{{ initials }}</twig:Avatar:Fallback>
+                                    </twig:Avatar>
+                                    <div class="grid flex-1 text-start text-sm leading-tight">
+                                        <span class="truncate font-semibold" data-test="current-user">{{ app.user.fullName }}</span>
+                                        <span class="truncate text-xs">{{ app.user.email }}</span>
+                                    </div>
+                                    <twig:ux:icon name="lucide:chevrons-up-down" class="ms-auto size-4" aria-hidden="true" />
+                                </twig:Sidebar:MenuButton>
+                            </twig:DropdownMenu:Trigger>
+                            <twig:DropdownMenu:Content class="w-56">
+                                <twig:DropdownMenu:Label class="font-normal">
+                                    <div class="grid text-sm leading-tight">
+                                        <span class="truncate font-semibold">{{ app.user.fullName }}</span>
+                                        <span class="truncate text-xs text-muted-foreground">{{ app.user.email }}</span>
+                                    </div>
+                                </twig:DropdownMenu:Label>
+                                <twig:DropdownMenu:Separator />
+                                <form method="post" action="{{ path('app_logout') }}">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+                                    {# A real submit button, styled like DropdownMenu:Item (which can only be type="button") #}
+                                    <button type="submit" role="menuitem" data-dropdown-menu-target="item" class="relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+                                        <twig:ux:icon name="lucide:log-out" aria-hidden="true" />
+                                        Wyloguj
+                                    </button>
+                                </form>
+                            </twig:DropdownMenu:Content>
+                        </twig:DropdownMenu>
+                    </twig:Sidebar:MenuItem>
+                </twig:Sidebar:Menu>
             </twig:Sidebar:Footer>
+
+            <twig:Sidebar:Rail />
         </twig:Sidebar>
 
         <twig:Sidebar:Inset>
-            <header class="flex h-14 items-center gap-2 border-b px-4">
-                <twig:Sidebar:Trigger aria-label="Pokaż lub ukryj menu">
+            <header class="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+                <twig:Sidebar:Trigger class="-ms-1" aria-label="Pokaż lub ukryj menu">
                     <twig:ux:icon name="lucide:panel-left" aria-hidden="true" />
                 </twig:Sidebar:Trigger>
-                <h1 class="text-base font-semibold">{{ heading_html|raw }}</h1>
+                <twig:Separator orientation="vertical" class="me-2 data-vertical:h-4 data-vertical:self-center" />
+
+                <twig:Breadcrumb>
+                    <twig:Breadcrumb:List>
+                        {% if current_section %}
+                            <twig:Breadcrumb:Item class="hidden md:inline-flex">{{ current_section }}</twig:Breadcrumb:Item>
+                            <twig:Breadcrumb:Separator class="hidden md:block" />
+                        {% endif %}
+                        <twig:Breadcrumb:Item>
+                            {# The current page is also the page's only heading #}
+                            <h1 data-slot="breadcrumb-page" aria-current="page" class="font-medium text-foreground">{{ heading_html|raw }}</h1>
+                        </twig:Breadcrumb:Item>
+                    </twig:Breadcrumb:List>
+                </twig:Breadcrumb>
+
+                <twig:Button variant="ghost" size="icon-sm" class="ms-auto" data-controller="theme" data-action="theme#toggle" aria-label="Przełącz motyw jasny i ciemny" title="Przełącz motyw">
+                    <twig:ux:icon name="lucide:sun" class="dark:hidden" aria-hidden="true" />
+                    <twig:ux:icon name="lucide:moon" class="hidden dark:block" aria-hidden="true" />
+                </twig:Button>
             </header>
 
-            <main class="flex flex-1 flex-col gap-4 p-4">
+            <div class="flex flex-1 flex-col gap-4 p-4">
                 {% for type, messages in app.flashes %}
                     {% for message in messages %}
                         <twig:Alert variant="{{ type == 'error' ? 'destructive' : 'default' }}" data-test="flash">
@@ -122,7 +158,7 @@
                 {% endfor %}
 
                 {{ page_html|raw }}
-            </main>
+            </div>
         </twig:Sidebar:Inset>
     </twig:Sidebar:Provider>
 {% endblock %}
