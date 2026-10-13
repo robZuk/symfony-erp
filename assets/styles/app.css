@@ -136,6 +136,17 @@
 }
 
 @layer base {
+    /* Tailwind 4 leaves buttons with the default arrow; anything clickable gets the hand back */
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    select:not(:disabled),
+    summary,
+    label[for],
+    input[type='checkbox']:not(:disabled),
+    input[type='radio']:not(:disabled) {
+        cursor: pointer;
+    }
+
     * {
         @apply border-border outline-ring/50;
     }

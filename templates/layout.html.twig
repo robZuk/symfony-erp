@@ -121,7 +121,7 @@
                                 <form method="post" action="{{ path('app_logout') }}">
                                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
                                     {# A real submit button, styled like DropdownMenu:Item (which can only be type="button") #}
-                                    <button type="submit" role="menuitem" data-dropdown-menu-target="item" class="relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+                                    <button type="submit" role="menuitem" data-dropdown-menu-target="item" class="relative flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground [&_svg]:size-4 [&_svg]:shrink-0">
                                         <twig:ux:icon name="lucide:log-out" aria-hidden="true" />
                                         Wyloguj
                                     </button>
