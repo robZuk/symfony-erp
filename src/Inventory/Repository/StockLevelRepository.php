@@ -126,4 +126,33 @@ class StockLevelRepository extends ServiceEntityRepository
 
         return $levels;
     }
+
+    /**
+     * What is available of each product, all warehouses together.
+     *
+     * @param list<int> $productIds
+     *
+     * @return array<int, int> product id => available quantity in thousandths; products never stocked are missing
+     */
+    public function availableByProduct(array $productIds): array
+    {
+        if ([] === $productIds) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('l')
+            ->select('l.productId AS product', 'SUM(l.quantity - l.reserved) AS available')
+            ->where('l.productId IN (:products)')
+            ->setParameter('products', $productIds)
+            ->groupBy('l.productId')
+            ->getQuery()
+            ->getArrayResult();
+
+        $available = [];
+        foreach ($rows as $row) {
+            $available[(int) $row['product']] = (int) $row['available'];
+        }
+
+        return $available;
+    }
 }

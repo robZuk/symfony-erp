@@ -20,6 +20,8 @@ final readonly class ProductSummary
         /** Catalog net price for one unit, in grosze. */
         public int $netPrice,
         public VatRate $vatRate,
+        /** Reorder level in thousandths of the unit; zero when the product is not watched. */
+        public int $minimumStock = 0,
     ) {
     }
 

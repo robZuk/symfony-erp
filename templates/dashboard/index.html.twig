@@ -4,10 +4,174 @@
 {% block heading %}Pulpit{% endblock %}
 
 {% block page %}
-    <twig:Card>
-        <twig:Card:Header>
-            <twig:Card:Title>Witaj, {{ app.user.fullName }}</twig:Card:Title>
-            <twig:Card:Description>Moduły systemu pojawią się tutaj w kolejnych etapach.</twig:Card:Description>
-        </twig:Card:Header>
+    {% set this_month = sales|last %}
+    {% set previous_month = sales[sales|length - 2] %}
+    {% set change = previous_month.net.minor > 0 ? ((this_month.net.minor - previous_month.net.minor) / previous_month.net.minor * 100)|round : null %}
+    {% set peak = max(sales|map(row => row.net.minor)|merge([1])) %}
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <twig:Card data-test="tile-sales">
+            <twig:Card:Header>
+                <twig:Card:Description>Sprzedaż netto w tym miesiącu</twig:Card:Description>
+                <twig:Card:Title class="text-2xl tabular-nums">{{ this_month.net|money }}</twig:Card:Title>
+            </twig:Card:Header>
+            <twig:Card:Content class="text-sm text-muted-foreground">
+                {% if change is null %}
+                    Brak sprzedaży w poprzednim miesiącu
+                {% else %}
+                    {# The direction is said in words and with an arrow, never by colour alone #}
+                    <span class="font-medium text-foreground">{{ change >= 0 ? '↑' : '↓' }} {{ change|abs }}%</span>
+                    {{ change >= 0 ? 'więcej' : 'mniej' }} niż miesiąc wcześniej
+                {% endif %}
+            </twig:Card:Content>
+        </twig:Card>
+
+        <twig:Card data-test="tile-to-ship">
+            <twig:Card:Header>
+                <twig:Card:Description>Zamówienia do wydania</twig:Card:Description>
+                <twig:Card:Title class="text-2xl tabular-nums">{{ queue.toShip }}</twig:Card:Title>
+            </twig:Card:Header>
+            <twig:Card:Content class="text-sm">
+                <a href="{{ path('sales_order_index', {status: 'confirmed'}) }}" class="underline underline-offset-4">Potwierdzone, czekają na magazyn</a>
+            </twig:Card:Content>
+        </twig:Card>
+
+        <twig:Card data-test="tile-to-invoice">
+            <twig:Card:Header>
+                <twig:Card:Description>Zamówienia do zafakturowania</twig:Card:Description>
+                <twig:Card:Title class="text-2xl tabular-nums">{{ queue.toInvoice }}</twig:Card:Title>
+            </twig:Card:Header>
+            <twig:Card:Content class="text-sm">
+                <a href="{{ path('sales_order_index', {status: 'shipped'}) }}" class="underline underline-offset-4">Wydane, czekają na fakturę</a>
+            </twig:Card:Content>
+        </twig:Card>
+
+        <twig:Card data-test="tile-low-stock">
+            <twig:Card:Header>
+                <twig:Card:Description>Produkty poniżej stanu minimalnego</twig:Card:Description>
+                <twig:Card:Title class="text-2xl tabular-nums">{{ low_stock|length }}</twig:Card:Title>
+            </twig:Card:Header>
+            <twig:Card:Content class="text-sm text-muted-foreground">
+                {{ low_stock is empty ? 'Niczego nie brakuje' : 'Lista poniżej' }}
+            </twig:Card:Content>
+        </twig:Card>
+    </div>
+
+    <div class="grid gap-4 xl:grid-cols-5">
+        <twig:Card class="xl:col-span-3">
+            <twig:Card:Header>
+                <twig:Card:Title>Sprzedaż netto, ostatnie {{ sales|length }} miesięcy</twig:Card:Title>
+                <twig:Card:Description>Faktury i korekty według daty wystawienia.</twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content>
+                {# A column chart drawn with plain HTML: one hue, thin columns that grow from a single baseline.
+                   Each column has a hover/focus tooltip; the table underneath gives the same numbers as text. #}
+                <figure>
+                    <div class="flex h-48 items-end gap-2 border-b border-border" role="img"
+                         aria-label="Wykres kolumnowy sprzedaży netto w kolejnych miesiącach. Te same dane są w tabeli poniżej.">
+                        {% for row in sales %}
+                            {% set share = row.net.minor > 0 ? (row.net.minor / peak * 100) : 0 %}
+                            <div class="group relative flex h-full flex-1 items-end justify-center outline-none" tabindex="0" data-test="sales-column">
+                                <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden rounded-md border bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground shadow-md group-hover:block group-focus:block">
+                                    <span class="text-muted-foreground">{{ row.month|format_datetime(pattern: 'LLLL yyyy', locale: 'pl') }}</span>
+                                    <span class="ms-1 font-medium tabular-nums">{{ row.net|money }}</span>
+                                </div>
+                                {% if loop.last %}
+                                    {# Only the newest month is labelled directly; the others are a hover away #}
+                                    <span class="absolute text-xs font-medium tabular-nums" style="bottom: calc({{ share|round(2) }}% + 0.25rem)">{{ row.net|money }}</span>
+                                {% endif %}
+                                <div class="w-6 rounded-t bg-primary transition-opacity group-hover:opacity-80 group-focus:opacity-80" style="height: {{ share|round(2) }}%"></div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-1 flex gap-2 text-xs text-muted-foreground">
+                        {% for row in sales %}
+                            <div class="flex-1 text-center">{{ row.month|format_datetime(pattern: 'LLL', locale: 'pl') }}</div>
+                        {% endfor %}
+                    </div>
+                </figure>
+
+                <details class="mt-4 text-sm">
+                    <summary class="cursor-pointer text-muted-foreground">Pokaż dane w tabeli</summary>
+                    <table class="mt-2 w-full max-w-xs">
+                        <tbody class="tabular-nums">
+                            {% for row in sales %}
+                                <tr data-test="sales-row">
+                                    <td class="py-0.5">{{ row.month|format_datetime(pattern: 'LLLL yyyy', locale: 'pl') }}</td>
+                                    <td class="py-0.5 text-end">{{ row.net|money }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </details>
+            </twig:Card:Content>
+        </twig:Card>
+
+        <twig:Card class="xl:col-span-2">
+            <twig:Card:Header>
+                <twig:Card:Title>Do zamówienia u dostawców</twig:Card:Title>
+                <twig:Card:Description>Dostępna ilość spadła poniżej stanu minimalnego.</twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content>
+                {% if low_stock is empty %}
+                    <p class="text-sm text-muted-foreground">Wszystkie pilnowane produkty są powyżej minimum.</p>
+                {% else %}
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-muted-foreground">
+                                <th class="pb-1 text-start font-normal">Produkt</th>
+                                <th class="pb-1 text-end font-normal">Dostępne</th>
+                                <th class="pb-1 text-end font-normal">Minimum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in low_stock %}
+                                <tr data-test="low-stock-row">
+                                    <td class="py-1">
+                                        <a href="{{ path('inventory_stock_product', {productId: row.product.id}) }}" class="font-medium underline-offset-4 hover:underline">{{ row.product.name }}</a>
+                                        <div class="font-mono text-xs text-muted-foreground">{{ row.product.sku }}</div>
+                                    </td>
+                                    <td class="py-1 text-end align-top tabular-nums">{{ row.available|quantity }} {{ row.product.unit }}</td>
+                                    <td class="py-1 text-end align-top tabular-nums text-muted-foreground">{{ row.product.minimumStock|quantity }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </twig:Card:Content>
+        </twig:Card>
+    </div>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head>Ostatnie zamówienia</twig:Table:Head>
+                    <twig:Table:Head>Data</twig:Table:Head>
+                    <twig:Table:Head>Odbiorca</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Brutto</twig:Table:Head>
+                    <twig:Table:Head>Status</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for row in latest_orders %}
+                    <twig:Table:Row data-test="latest-order-row">
+                        <twig:Table:Cell class="font-medium">
+                            <a href="{{ path('sales_order_show', {id: row.order.id}) }}" class="underline-offset-4 hover:underline">{{ row.order.title }}</a>
+                        </twig:Table:Cell>
+                        <twig:Table:Cell>{{ row.order.orderDate|date('d.m.Y') }}</twig:Table:Cell>
+                        <twig:Table:Cell>{{ row.customer }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ row.order.totals.gross|money }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            <twig:Badge variant="{{ row.order.status.value in ['draft', 'cancelled'] ? 'outline' : 'secondary' }}">{{ row.order.status.label }}</twig:Badge>
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="5" class="h-24 text-center text-muted-foreground">Nie ma jeszcze żadnych zamówień.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
     </twig:Card>
 {% endblock %}

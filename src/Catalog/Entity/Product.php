@@ -43,6 +43,14 @@ class Product
     #[Assert\PositiveOrZero]
     private int $netPrice = 0;
 
+    /**
+     * Stock level, in thousandths of the unit, below which the product should be reordered.
+     * Zero means the product is not watched.
+     */
+    #[ORM\Column(options: ['default' => 0])]
+    #[Assert\PositiveOrZero]
+    private int $minimumStock = 0;
+
     #[ORM\Column]
     private bool $active = true;
 
@@ -109,6 +117,16 @@ class Product
     public function setNetPrice(?int $netPrice): void
     {
         $this->netPrice = $netPrice ?? 0;
+    }
+
+    public function getMinimumStock(): int
+    {
+        return $this->minimumStock;
+    }
+
+    public function setMinimumStock(?int $minimumStock): void
+    {
+        $this->minimumStock = $minimumStock ?? 0;
     }
 
     public function isActive(): bool

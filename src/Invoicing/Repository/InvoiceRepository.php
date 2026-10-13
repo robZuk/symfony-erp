@@ -43,4 +43,26 @@ class InvoiceRepository extends ServiceEntityRepository
 
         return $page;
     }
+
+    /**
+     * Net value invoiced in every month since the given date, corrections included.
+     *
+     * @return array<string, int> month as "2026-10" => net in grosze; months without invoices are missing
+     */
+    public function netByMonthSince(\DateTimeImmutable $from): array
+    {
+        // to_char is PostgreSQL; DQL has no portable way to group by month
+        $rows = $this->getEntityManager()->getConnection()->fetchAllKeyValue(
+            <<<'SQL'
+                SELECT to_char(issue_date, 'YYYY-MM') AS month, SUM(net_total) AS net
+                FROM invoicing_invoice
+                WHERE issue_date >= :from
+                GROUP BY 1
+                ORDER BY 1
+                SQL,
+            ['from' => $from->format('Y-m-d')],
+        );
+
+        return array_map(intval(...), $rows);
+    }
 }

@@ -4,7 +4,7 @@ CONSOLE ?= symfony console
 PHP ?= symfony php
 
 .DEFAULT_GOAL := help
-.PHONY: help up down serve db migrate css test lint fix stan deptrac
+.PHONY: help up down serve db migrate demo css test lint fix stan deptrac
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -24,6 +24,9 @@ db: ## Create the dev database and run migrations
 
 migrate: ## Run pending migrations
 	$(CONSOLE) doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+demo: ## Replace everything in the dev database with demo data
+	$(CONSOLE) doctrine:fixtures:load --no-interaction --purge-with-truncate
 
 css: ## Build the Tailwind stylesheet
 	$(CONSOLE) tailwind:build

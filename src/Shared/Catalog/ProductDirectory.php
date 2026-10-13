@@ -32,6 +32,13 @@ interface ProductDirectory
     public function sellable(): array;
 
     /**
+     * Active goods that have a minimum stock level set, ordered by name.
+     *
+     * @return list<ProductSummary>
+     */
+    public function watched(): array;
+
+    /**
      * Ids of products whose name or SKU contains the term.
      *
      * @return list<int>

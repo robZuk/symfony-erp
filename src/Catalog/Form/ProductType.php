@@ -5,6 +5,7 @@ namespace App\Catalog\Form;
 use App\Catalog\Entity\Product;
 use App\Catalog\Entity\ProductKind;
 use App\Catalog\Entity\UnitOfMeasure;
+use App\Shared\Form\QuantityType;
 use App\Shared\Tax\VatRate;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
@@ -49,6 +50,12 @@ final class ProductType extends AbstractType
                 'label' => 'Stawka VAT',
                 'choice_label' => static fn (VatRate $rate): string => $rate->label(),
             ]);
+
+        $builder->add('minimumStock', QuantityType::class, [
+            'label' => 'Stan minimalny',
+            'required' => false,
+            'help' => 'Poniżej tej ilości produkt trafia na listę do zamówienia. Zero wyłącza pilnowanie.',
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

@@ -48,6 +48,19 @@ final class DoctrineProductDirectory implements ProductDirectory
         return array_map(self::summarize(...), $this->products->findBy(['active' => true], ['name' => 'ASC']));
     }
 
+    public function watched(): array
+    {
+        /** @var list<Product> $products */
+        $products = $this->products->createQueryBuilder('p')
+            ->where('p.active = true AND p.kind = :goods AND p.minimumStock > 0')
+            ->setParameter('goods', ProductKind::Goods)
+            ->orderBy('p.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return array_map(self::summarize(...), $products);
+    }
+
     public function idsMatching(string $term): array
     {
         /** @var list<int> $ids */
@@ -72,6 +85,7 @@ final class DoctrineProductDirectory implements ProductDirectory
             $product->isActive(),
             $product->getNetPrice(),
             $product->getVatRate(),
+            $product->getMinimumStock(),
         );
     }
 }
