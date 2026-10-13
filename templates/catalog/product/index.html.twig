@@ -5,14 +5,14 @@
 
 {% block page %}
     <div class="flex flex-wrap items-end justify-between gap-2">
-        <form method="get" action="{{ path('catalog_product_index') }}" class="flex flex-wrap items-end gap-2" role="search">
+        <form method="get" action="{{ path('catalog_product_index') }}" class="flex flex-wrap items-end gap-2" role="search" data-controller="auto-submit" data-turbo-frame="results">
             <twig:Input type="search" name="q" value="{{ filter.q }}" placeholder="Szukaj po nazwie lub indeksie" aria-label="Szukaj" class="w-64" />
             <twig:NativeSelect size="sm" name="status" aria-label="Status">
                 <option value="active"{{ filter.status == 'active' ? ' selected' }}>Aktywne</option>
                 <option value="inactive"{{ filter.status == 'inactive' ? ' selected' }}>Wycofane</option>
                 <option value="all"{{ filter.status == 'all' ? ' selected' }}>Wszystkie</option>
             </twig:NativeSelect>
-            <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
+            <twig:Button type="submit" variant="outline" data-auto-submit-target="submit">Szukaj</twig:Button>
         </form>
 
         {% if is_granted('ROLE_CATALOG_EDIT') %}
@@ -23,56 +23,60 @@
         {% endif %}
     </div>
 
-    <twig:Card class="py-0">
-        <twig:Table>
-            <twig:Table:Header>
-                <twig:Table:Row>
-                    <twig:Table:Head>Indeks</twig:Table:Head>
-                    <twig:Table:Head>Nazwa</twig:Table:Head>
-                    <twig:Table:Head>Rodzaj</twig:Table:Head>
-                    <twig:Table:Head>J.m.</twig:Table:Head>
-                    <twig:Table:Head class="text-end">Cena netto</twig:Table:Head>
-                    <twig:Table:Head class="text-end">VAT</twig:Table:Head>
-                    <twig:Table:Head>Status</twig:Table:Head>
-                    <twig:Table:Head><span class="sr-only">Akcje</span></twig:Table:Head>
-                </twig:Table:Row>
-            </twig:Table:Header>
-            <twig:Table:Body>
-                {% for product in page.items %}
-                    <twig:Table:Row data-test="product-row">
-                        <twig:Table:Cell class="font-mono">{{ product.sku }}</twig:Table:Cell>
-                        <twig:Table:Cell class="font-medium">{{ product.name }}</twig:Table:Cell>
-                        <twig:Table:Cell>{{ product.kind.label }}</twig:Table:Cell>
-                        <twig:Table:Cell>{{ product.unit.label }}</twig:Table:Cell>
-                        <twig:Table:Cell class="text-end tabular-nums">{{ product.netPrice|money }}</twig:Table:Cell>
-                        <twig:Table:Cell class="text-end">{{ product.vatRate.label }}</twig:Table:Cell>
-                        <twig:Table:Cell>
-                            {% if product.active %}
-                                <twig:Badge variant="secondary">Aktywny</twig:Badge>
-                            {% else %}
-                                <twig:Badge variant="outline">Wycofany</twig:Badge>
-                            {% endif %}
-                        </twig:Table:Cell>
-                        <twig:Table:Cell>
-                            {% if is_granted('ROLE_CATALOG_EDIT') %}
-                                <div class="flex justify-end gap-1">
-                                    <twig:Button as="a" variant="ghost" size="sm" href="{{ path('catalog_product_edit', {id: product.id}) }}">Edytuj</twig:Button>
-                                    <form method="post" action="{{ path('catalog_product_toggle', {id: product.id}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('catalog_product_toggle') }}">
-                                        <twig:Button type="submit" variant="ghost" size="sm">{{ product.active ? 'Wycofaj' : 'Przywróć' }}</twig:Button>
-                                    </form>
-                                </div>
-                            {% endif %}
-                        </twig:Table:Cell>
-                    </twig:Table:Row>
-                {% else %}
+    {# Only this part is replaced when the filters change, so the form above keeps its focus.
+       Links inside lead to other pages (target="_top"); the address bar follows the filters without adding a history entry for each one ("replace"). #}
+    <turbo-frame id="results" target="_top" data-turbo-action="replace" class="flex flex-col gap-4">
+        <twig:Card class="py-0">
+            <twig:Table>
+                <twig:Table:Header>
                     <twig:Table:Row>
-                        <twig:Table:Cell colspan="8" class="h-24 text-center text-muted-foreground">Brak produktów spełniających kryteria.</twig:Table:Cell>
+                        <twig:Table:Head>Indeks</twig:Table:Head>
+                        <twig:Table:Head>Nazwa</twig:Table:Head>
+                        <twig:Table:Head>Rodzaj</twig:Table:Head>
+                        <twig:Table:Head>J.m.</twig:Table:Head>
+                        <twig:Table:Head class="text-end">Cena netto</twig:Table:Head>
+                        <twig:Table:Head class="text-end">VAT</twig:Table:Head>
+                        <twig:Table:Head>Status</twig:Table:Head>
+                        <twig:Table:Head><span class="sr-only">Akcje</span></twig:Table:Head>
                     </twig:Table:Row>
-                {% endfor %}
-            </twig:Table:Body>
-        </twig:Table>
-    </twig:Card>
+                </twig:Table:Header>
+                <twig:Table:Body>
+                    {% for product in page.items %}
+                        <twig:Table:Row data-test="product-row">
+                            <twig:Table:Cell class="font-mono">{{ product.sku }}</twig:Table:Cell>
+                            <twig:Table:Cell class="font-medium">{{ product.name }}</twig:Table:Cell>
+                            <twig:Table:Cell>{{ product.kind.label }}</twig:Table:Cell>
+                            <twig:Table:Cell>{{ product.unit.label }}</twig:Table:Cell>
+                            <twig:Table:Cell class="text-end tabular-nums">{{ product.netPrice|money }}</twig:Table:Cell>
+                            <twig:Table:Cell class="text-end">{{ product.vatRate.label }}</twig:Table:Cell>
+                            <twig:Table:Cell>
+                                {% if product.active %}
+                                    <twig:Badge variant="secondary">Aktywny</twig:Badge>
+                                {% else %}
+                                    <twig:Badge variant="outline">Wycofany</twig:Badge>
+                                {% endif %}
+                            </twig:Table:Cell>
+                            <twig:Table:Cell>
+                                {% if is_granted('ROLE_CATALOG_EDIT') %}
+                                    <div class="flex justify-end gap-1">
+                                        <twig:Button as="a" variant="ghost" size="sm" href="{{ path('catalog_product_edit', {id: product.id}) }}">Edytuj</twig:Button>
+                                        <form method="post" action="{{ path('catalog_product_toggle', {id: product.id}) }}">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('catalog_product_toggle') }}">
+                                            <twig:Button type="submit" variant="ghost" size="sm">{{ product.active ? 'Wycofaj' : 'Przywróć' }}</twig:Button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% else %}
+                        <twig:Table:Row>
+                            <twig:Table:Cell colspan="8" class="h-24 text-center text-muted-foreground">Brak produktów spełniających kryteria.</twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% endfor %}
+                </twig:Table:Body>
+            </twig:Table>
+        </twig:Card>
 
-    <twig:Pager :page="page" route="catalog_product_index" :query="filter.toQuery()" />
+        <twig:Pager :page="page" route="catalog_product_index" :query="filter.toQuery()" />
+    </turbo-frame>
 {% endblock %}

@@ -4,7 +4,7 @@
 {% block heading %}Stany magazynowe{% endblock %}
 
 {% block page %}
-    <form method="get" action="{{ path('inventory_stock_index') }}" class="flex flex-wrap items-center gap-2" role="search">
+    <form method="get" action="{{ path('inventory_stock_index') }}" class="flex flex-wrap items-center gap-2" role="search" data-controller="auto-submit" data-turbo-frame="results">
         <twig:Input type="search" name="q" value="{{ filter.q }}" placeholder="Szukaj po nazwie lub indeksie" aria-label="Szukaj" class="w-64" />
         <twig:NativeSelect size="sm" name="warehouse" aria-label="Magazyn">
             <option value="">Wszystkie magazyny</option>
@@ -16,44 +16,48 @@
             <twig:Checkbox name="includeEmpty" value="1" :checked="filter.includeEmpty" />
             Pokaż zerowe
         </label>
-        <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
+        <twig:Button type="submit" variant="outline" data-auto-submit-target="submit">Szukaj</twig:Button>
     </form>
 
-    <twig:Card class="py-0">
-        <twig:Table>
-            <twig:Table:Header>
-                <twig:Table:Row>
-                    <twig:Table:Head>Magazyn</twig:Table:Head>
-                    <twig:Table:Head>Indeks</twig:Table:Head>
-                    <twig:Table:Head>Nazwa</twig:Table:Head>
-                    <twig:Table:Head class="text-end">Stan</twig:Table:Head>
-                    <twig:Table:Head class="text-end">Zarezerwowane</twig:Table:Head>
-                    <twig:Table:Head class="text-end">Dostępne</twig:Table:Head>
-                    <twig:Table:Head>J.m.</twig:Table:Head>
-                </twig:Table:Row>
-            </twig:Table:Header>
-            <twig:Table:Body>
-                {% for level in page.items %}
-                    {% set product = products[level.productId] ?? null %}
-                    <twig:Table:Row data-test="stock-row">
-                        <twig:Table:Cell class="font-mono">{{ level.warehouse.code }}</twig:Table:Cell>
-                        <twig:Table:Cell class="font-mono">
-                            <a href="{{ path('inventory_stock_product', {productId: level.productId}) }}" class="underline-offset-4 hover:underline" data-test="stock-sku">{{ product.sku ?? ('#' ~ level.productId) }}</a>
-                        </twig:Table:Cell>
-                        <twig:Table:Cell class="font-medium">{{ product.name ?? '—' }}</twig:Table:Cell>
-                        <twig:Table:Cell class="text-end tabular-nums" data-test="stock-quantity">{{ level.quantity|quantity }}</twig:Table:Cell>
-                        <twig:Table:Cell class="text-end tabular-nums">{{ level.reserved|quantity }}</twig:Table:Cell>
-                        <twig:Table:Cell class="text-end font-medium tabular-nums">{{ level.available|quantity }}</twig:Table:Cell>
-                        <twig:Table:Cell>{{ product.unit ?? '' }}</twig:Table:Cell>
-                    </twig:Table:Row>
-                {% else %}
+    {# Only this part is replaced when the filters change, so the form above keeps its focus.
+       Links inside lead to other pages (target="_top"); the address bar follows the filters without adding a history entry for each one ("replace"). #}
+    <turbo-frame id="results" target="_top" data-turbo-action="replace" class="flex flex-col gap-4">
+        <twig:Card class="py-0">
+            <twig:Table>
+                <twig:Table:Header>
                     <twig:Table:Row>
-                        <twig:Table:Cell colspan="7" class="h-24 text-center text-muted-foreground">Brak stanów spełniających kryteria.</twig:Table:Cell>
+                        <twig:Table:Head>Magazyn</twig:Table:Head>
+                        <twig:Table:Head>Indeks</twig:Table:Head>
+                        <twig:Table:Head>Nazwa</twig:Table:Head>
+                        <twig:Table:Head class="text-end">Stan</twig:Table:Head>
+                        <twig:Table:Head class="text-end">Zarezerwowane</twig:Table:Head>
+                        <twig:Table:Head class="text-end">Dostępne</twig:Table:Head>
+                        <twig:Table:Head>J.m.</twig:Table:Head>
                     </twig:Table:Row>
-                {% endfor %}
-            </twig:Table:Body>
-        </twig:Table>
-    </twig:Card>
+                </twig:Table:Header>
+                <twig:Table:Body>
+                    {% for level in page.items %}
+                        {% set product = products[level.productId] ?? null %}
+                        <twig:Table:Row data-test="stock-row">
+                            <twig:Table:Cell class="font-mono">{{ level.warehouse.code }}</twig:Table:Cell>
+                            <twig:Table:Cell class="font-mono">
+                                <a href="{{ path('inventory_stock_product', {productId: level.productId}) }}" class="underline-offset-4 hover:underline" data-test="stock-sku">{{ product.sku ?? ('#' ~ level.productId) }}</a>
+                            </twig:Table:Cell>
+                            <twig:Table:Cell class="font-medium">{{ product.name ?? '—' }}</twig:Table:Cell>
+                            <twig:Table:Cell class="text-end tabular-nums" data-test="stock-quantity">{{ level.quantity|quantity }}</twig:Table:Cell>
+                            <twig:Table:Cell class="text-end tabular-nums">{{ level.reserved|quantity }}</twig:Table:Cell>
+                            <twig:Table:Cell class="text-end font-medium tabular-nums">{{ level.available|quantity }}</twig:Table:Cell>
+                            <twig:Table:Cell>{{ product.unit ?? '' }}</twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% else %}
+                        <twig:Table:Row>
+                            <twig:Table:Cell colspan="7" class="h-24 text-center text-muted-foreground">Brak stanów spełniających kryteria.</twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% endfor %}
+                </twig:Table:Body>
+            </twig:Table>
+        </twig:Card>
 
-    <twig:Pager :page="page" route="inventory_stock_index" :query="filter.toQuery()" />
+        <twig:Pager :page="page" route="inventory_stock_index" :query="filter.toQuery()" />
+    </turbo-frame>
 {% endblock %}
