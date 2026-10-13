@@ -1,0 +1,36 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Logowanie – Mini-ERP{% endblock %}
+
+{% block body %}
+    <div class="flex min-h-svh items-center justify-center bg-muted p-6">
+        <twig:Card class="w-full max-w-sm">
+            <twig:Card:Header>
+                <twig:Card:Title class="text-2xl">Logowanie</twig:Card:Title>
+                <twig:Card:Description>Podaj e-mail i hasło, aby wejść do systemu.</twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content>
+                <form method="post" action="{{ path('app_login') }}" class="flex flex-col gap-6">
+                    {% if error %}
+                        <twig:Alert variant="destructive">
+                            <twig:Alert:Description>{{ error.messageKey|trans(error.messageData, 'security') }}</twig:Alert:Description>
+                        </twig:Alert>
+                    {% endif %}
+
+                    <div class="grid gap-2">
+                        <twig:Label for="username">E-mail</twig:Label>
+                        <twig:Input id="username" type="email" name="_username" value="{{ last_username }}" autocomplete="email" required autofocus />
+                    </div>
+                    <div class="grid gap-2">
+                        <twig:Label for="password">Hasło</twig:Label>
+                        <twig:Input id="password" type="password" name="_password" autocomplete="current-password" required />
+                    </div>
+
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+                    <twig:Button type="submit" class="w-full">Zaloguj</twig:Button>
+                </form>
+            </twig:Card:Content>
+        </twig:Card>
+    </div>
+{% endblock %}

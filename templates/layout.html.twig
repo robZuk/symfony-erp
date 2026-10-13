@@ -1,0 +1,76 @@
+{% extends 'base.html.twig' %}
+
+{% set current_route = app.request.attributes.get('_route') %}
+
+{# Pages fill these two blocks. They are captured here because a block cannot be
+   declared inside a <twig:...> component: there it would belong to the component. #}
+{% block heading %}{% endblock %}
+{% block page %}{% endblock %}
+
+{% block body %}
+    {% set heading_html = block('heading') %}
+    {% set page_html = block('page') %}
+
+    <twig:Sidebar:Provider id="app-sidebar">
+        <twig:Sidebar>
+            <twig:Sidebar:Header>
+                <a href="{{ path('app_dashboard') }}" class="flex items-center gap-2 p-2">
+                    <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                        <twig:ux:icon name="lucide:package" class="size-4" aria-hidden="true" />
+                    </div>
+                    <span class="font-semibold">Mini-ERP</span>
+                </a>
+            </twig:Sidebar:Header>
+
+            <twig:Sidebar:Content>
+                <twig:Sidebar:Group>
+                    <twig:Sidebar:GroupContent>
+                        <twig:Sidebar:Menu>
+                            <twig:Sidebar:MenuItem>
+                                <twig:Sidebar:MenuButton as="a" href="{{ path('app_dashboard') }}" active="{{ current_route == 'app_dashboard' }}">
+                                    <twig:ux:icon name="lucide:layout-dashboard" aria-hidden="true" />
+                                    <span>Pulpit</span>
+                                </twig:Sidebar:MenuButton>
+                            </twig:Sidebar:MenuItem>
+                        </twig:Sidebar:Menu>
+                    </twig:Sidebar:GroupContent>
+                </twig:Sidebar:Group>
+            </twig:Sidebar:Content>
+
+            <twig:Sidebar:Footer>
+                <div class="flex items-center gap-2 p-2">
+                    <div class="grid flex-1 text-sm leading-tight">
+                        <span class="truncate font-semibold" data-test="current-user">{{ app.user.fullName }}</span>
+                        <span class="truncate text-xs text-muted-foreground">{{ app.user.email }}</span>
+                    </div>
+                    <form method="post" action="{{ path('app_logout') }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+                        <twig:Button type="submit" variant="ghost" size="icon" title="Wyloguj">
+                            <twig:ux:icon name="lucide:log-out" aria-hidden="true" />
+                            <span class="sr-only">Wyloguj</span>
+                        </twig:Button>
+                    </form>
+                </div>
+            </twig:Sidebar:Footer>
+        </twig:Sidebar>
+
+        <twig:Sidebar:Inset>
+            <header class="flex h-14 items-center gap-2 border-b px-4">
+                <twig:Sidebar:Trigger />
+                <h1 class="text-base font-semibold">{{ heading_html|raw }}</h1>
+            </header>
+
+            <main class="flex flex-1 flex-col gap-4 p-4">
+                {% for type, messages in app.flashes %}
+                    {% for message in messages %}
+                        <twig:Alert variant="{{ type == 'error' ? 'destructive' : 'default' }}">
+                            <twig:Alert:Description>{{ message }}</twig:Alert:Description>
+                        </twig:Alert>
+                    {% endfor %}
+                {% endfor %}
+
+                {{ page_html|raw }}
+            </main>
+        </twig:Sidebar:Inset>
+    </twig:Sidebar:Provider>
+{% endblock %}

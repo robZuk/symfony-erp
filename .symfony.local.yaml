@@ -1,0 +1,4 @@
+# Background processes started together with `symfony server:start`
+workers:
+    tailwind:
+        cmd: ['symfony', 'console', 'tailwind:build', '--watch']

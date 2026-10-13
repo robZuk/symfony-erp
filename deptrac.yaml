@@ -28,6 +28,10 @@ deptrac:
         - name: Invoicing
           collectors:
               - { type: classLike, value: '^App\\Invoicing\\.*' }
+        # UI shell (home page, reports); the only place allowed to read from every module
+        - name: Dashboard
+          collectors:
+              - { type: classLike, value: '^App\\Dashboard\\.*' }
     ruleset:
         Shared: ~
         Identity: [Shared]
@@ -36,3 +40,4 @@ deptrac:
         Inventory: [Shared]
         Sales: [Shared]
         Invoicing: [Shared]
+        Dashboard: [Shared, Identity, Catalog, Partner, Inventory, Sales, Invoicing]

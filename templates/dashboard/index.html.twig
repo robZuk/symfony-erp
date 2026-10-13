@@ -1,0 +1,13 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Pulpit – Mini-ERP{% endblock %}
+{% block heading %}Pulpit{% endblock %}
+
+{% block page %}
+    <twig:Card>
+        <twig:Card:Header>
+            <twig:Card:Title>Witaj, {{ app.user.fullName }}</twig:Card:Title>
+            <twig:Card:Description>Moduły systemu pojawią się tutaj w kolejnych etapach.</twig:Card:Description>
+        </twig:Card:Header>
+    </twig:Card>
+{% endblock %}

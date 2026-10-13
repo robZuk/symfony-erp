@@ -4,7 +4,7 @@ CONSOLE ?= symfony console
 PHP ?= symfony php
 
 .DEFAULT_GOAL := help
-.PHONY: help up down serve db migrate test lint fix stan deptrac
+.PHONY: help up down serve db migrate css test lint fix stan deptrac
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -15,7 +15,7 @@ up: ## Start Postgres and Mailpit
 down: ## Stop containers
 	docker compose down
 
-serve: up ## Start the local web server
+serve: up ## Start the local web server (also watches Tailwind, see .symfony.local.yaml)
 	symfony server:start -d
 
 db: ## Create the dev database and run migrations
@@ -25,7 +25,10 @@ db: ## Create the dev database and run migrations
 migrate: ## Run pending migrations
 	$(CONSOLE) doctrine:migrations:migrate --no-interaction --allow-no-migration
 
-test: ## Prepare the test database and run PHPUnit
+css: ## Build the Tailwind stylesheet
+	$(CONSOLE) tailwind:build
+
+test: css ## Prepare the test database and run PHPUnit
 	$(CONSOLE) --env=test doctrine:database:create --if-not-exists
 	$(CONSOLE) --env=test doctrine:migrations:migrate --no-interaction --allow-no-migration
 	$(PHP) bin/phpunit

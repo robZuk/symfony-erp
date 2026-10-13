@@ -1,0 +1,3 @@
+symfonycasts_tailwind:
+    # Pinned so local and CI builds use the same Tailwind; bump with tailwind:update
+    binary_version: v4.3.3
