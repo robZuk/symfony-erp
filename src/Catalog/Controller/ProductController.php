@@ -68,7 +68,7 @@ final class ProductController extends AbstractController
         $product->setActive(!$product->isActive());
         $this->products->save($product);
         $this->addFlash('success', \sprintf(
-            $product->isActive() ? 'Przywrócono produkt %s.' : 'Wycofano produkt %s.',
+            $product->isActive() ? 'Przywrócono produkt %s.' : 'Wycofano produkt %s. Znajdziesz go pod filtrem „Wycofane”.',
             $product->getSku(),
         ));
 

@@ -117,14 +117,22 @@ final class UserAdminTest extends WebTestCase
         $this->client->followRedirect();
         self::assertSelectorTextContains('[data-test="flash"]', 'Zablokowano konto anna@example.com.');
 
-        $this->client->request('GET', '/admin/users?q=anna');
-        self::assertSelectorCount(0, '[data-test="user-row"]');
-
-        $crawler = $this->client->request('GET', '/admin/users?status=blocked');
+        // The blocked account stays on the list, marked as blocked and ready to be unblocked
+        $crawler = $this->client->request('GET', '/admin/users?q=anna');
+        self::assertSelectorCount(1, '[data-test="user-row"]');
         self::assertSelectorTextContains('[data-test="user-row"]', 'Zablokowany');
+
+        // The filters still separate the two groups
+        $this->client->request('GET', '/admin/users?q=anna&status=active');
+        self::assertSelectorCount(0, '[data-test="user-row"]');
+        $this->client->request('GET', '/admin/users?q=anna&status=blocked');
+        self::assertSelectorCount(1, '[data-test="user-row"]');
+
         $this->client->submit($crawler->selectButton('Odblokuj')->form());
         $this->client->followRedirect();
         self::assertSelectorTextContains('[data-test="flash"]', 'Odblokowano konto anna@example.com.');
+        $this->client->request('GET', '/admin/users?q=anna');
+        self::assertSelectorTextContains('[data-test="user-row"]', 'Aktywny');
     }
 
     public function testAdministratorCannotBlockOrDemoteThemselves(): void

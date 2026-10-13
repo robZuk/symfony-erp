@@ -68,7 +68,7 @@ final class PartnerController extends AbstractController
         $partner->setActive(!$partner->isActive());
         $this->partners->save($partner);
         $this->addFlash('success', \sprintf(
-            $partner->isActive() ? 'Przywrócono kontrahenta %s.' : 'Zarchiwizowano kontrahenta %s.',
+            $partner->isActive() ? 'Przywrócono kontrahenta %s.' : 'Zarchiwizowano kontrahenta %s. Znajdziesz go pod filtrem „Zarchiwizowani”.',
             $partner->getName(),
         ));
 

@@ -12,8 +12,9 @@ final class UserFilter
     #[Assert\Length(max: 100)]
     public string $q = '';
 
+    /** Everybody by default: a blocked account must stay in sight, or blocking looks like deleting. */
     #[Assert\Choice(choices: ['active', 'blocked', 'all'])]
-    public string $status = 'active';
+    public string $status = 'all';
 
     #[Assert\Positive]
     public int $page = 1;
@@ -26,7 +27,7 @@ final class UserFilter
     public function toQuery(): array
     {
         return array_filter(
-            ['q' => $this->q, 'status' => 'active' === $this->status ? '' : $this->status],
+            ['q' => $this->q, 'status' => 'all' === $this->status ? '' : $this->status],
             static fn (string $value): bool => '' !== $value,
         );
     }

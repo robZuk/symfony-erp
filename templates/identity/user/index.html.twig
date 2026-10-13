@@ -8,9 +8,9 @@
         <form method="get" action="{{ path('identity_user_index') }}" class="flex flex-wrap items-end gap-2" role="search">
             <twig:Input type="search" name="q" value="{{ filter.q }}" placeholder="Szukaj po nazwisku lub e-mailu" aria-label="Szukaj" class="w-64" />
             <twig:NativeSelect size="sm" name="status" aria-label="Status">
+                <option value="all"{{ filter.status == 'all' ? ' selected' }}>Wszyscy</option>
                 <option value="active"{{ filter.status == 'active' ? ' selected' }}>Aktywni</option>
                 <option value="blocked"{{ filter.status == 'blocked' ? ' selected' }}>Zablokowani</option>
-                <option value="all"{{ filter.status == 'all' ? ' selected' }}>Wszyscy</option>
             </twig:NativeSelect>
             <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
         </form>
@@ -34,7 +34,7 @@
             </twig:Table:Header>
             <twig:Table:Body>
                 {% for user in page.items %}
-                    <twig:Table:Row data-test="user-row">
+                    <twig:Table:Row data-test="user-row" class="{{ user.active ? '' : 'text-muted-foreground' }}">
                         <twig:Table:Cell class="font-medium">
                             {{ user.fullName }}
                             {% if user == app.user %}<span class="font-normal text-muted-foreground">(Ty)</span>{% endif %}
