@@ -82,6 +82,7 @@ Kontrakty: `ProductDirectory`, `PartnerDirectory`, `WarehouseDirectory` (odczyt 
 
 - Nie ma osobnego modułu „admin”. Każdy moduł dostarcza własne ekrany administracyjne, a menu „Administracja” tylko je grupuje dla roli administratora.
 - Kont się nie usuwa, tylko blokuje: dokumenty i dziennik dalej na nie wskazują. Zablokowany użytkownik nie zaloguje się, a jego trwająca sesja kończy się przy następnym żądaniu. To samo dzieje się po zmianie hasła lub ról.
+- Po pięciu nieudanych logowaniach na jedno konto z jednego adresu kolejne próby są odrzucane przez 15 minut, nawet z poprawnym hasłem (`login_throttling`). Blokada trafia do dziennika raz, a nie przy każdej następnej próbie.
 - Administrator nie może zablokować siebie ani odebrać sobie roli, a w systemie zawsze zostaje przynajmniej jeden aktywny administrator.
 - Dziennik zdarzeń obejmuje operacje na dokumentach, zmiany w kartotekach, konta i logowania (także nieudane). Zmiany w kartotekach zapisuje automatycznie nasłuch Doctrine (`AuditListener`) dla encji oznaczonych interfejsem `Audited`, więc żadna edycja go nie ominie.
 - Wpis w dzienniku zdarzeń zapisuje się w tej samej transakcji co operacja, więc dziennik nigdy nie wspomina o czymś, co zostało wycofane.

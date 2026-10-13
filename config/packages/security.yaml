@@ -19,6 +19,11 @@ security:
             lazy: true
             provider: app_user_provider
             user_checker: App\Identity\Security\UserChecker
+            # After 5 failed sign-ins to one account from one address, further attempts are refused for 15 minutes.
+            # One address is also limited across all accounts (5 times as many attempts), against guessing many logins.
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
             form_login:
                 login_path: app_login
                 check_path: app_login

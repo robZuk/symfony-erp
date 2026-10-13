@@ -9,12 +9,14 @@ use App\Shared\Audit\ActivityEntry;
 use App\Shared\Audit\ActivityEntryRepository;
 use App\Shared\Audit\ActivityLog;
 use App\Tests\Support\CreatesRecords;
+use App\Tests\Support\ForgetsLoginAttempts;
 use App\Tests\Support\SignsIn;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 final class ActivityLogTest extends WebTestCase
 {
+    use ForgetsLoginAttempts;
     use CreatesRecords;
     use SignsIn;
 
@@ -23,6 +25,7 @@ final class ActivityLogTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = self::createClient();
+        $this->forgetLoginAttempts();
     }
 
     public function testWhatPeopleDoOnTheScreensIsLoggedUnderTheirName(): void

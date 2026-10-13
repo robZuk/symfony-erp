@@ -4,12 +4,14 @@ namespace App\Tests\Identity;
 
 use App\Identity\Entity\User;
 use App\Identity\Repository\UserRepository;
+use App\Tests\Support\ForgetsLoginAttempts;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class LoginTest extends WebTestCase
 {
+    use ForgetsLoginAttempts;
     private const string EMAIL = 'anna@example.com';
     private const string PASSWORD = 'correct-horse';
 
@@ -18,6 +20,7 @@ final class LoginTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = self::createClient();
+        $this->forgetLoginAttempts();
 
         $user = new User(self::EMAIL, 'Anna Nowak', [User::ROLE_SALES]);
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);

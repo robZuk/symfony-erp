@@ -5,6 +5,7 @@ namespace App\Tests\Identity;
 use App\Identity\Entity\User;
 use App\Identity\Repository\UserRepository;
 use App\Identity\Service\UserAdministration;
+use App\Tests\Support\ForgetsLoginAttempts;
 use App\Tests\Support\SignsIn;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -13,6 +14,7 @@ use Symfony\Component\DomCrawler\Form;
 
 final class UserAdminTest extends WebTestCase
 {
+    use ForgetsLoginAttempts;
     use SignsIn;
 
     private KernelBrowser $client;
@@ -20,6 +22,7 @@ final class UserAdminTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = self::createClient();
+        $this->forgetLoginAttempts();
     }
 
     public function testAdministratorCreatesAnAccountThatCanSignIn(): void

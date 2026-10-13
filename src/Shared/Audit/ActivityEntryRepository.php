@@ -44,4 +44,21 @@ class ActivityEntryRepository extends ServiceEntityRepository
 
         return $result;
     }
+
+    /**
+     * Whether the very same thing has already been logged since the given moment.
+     * Lets a caller report something once instead of every time it repeats.
+     */
+    public function hasSince(string $action, string $summary, \DateTimeImmutable $since): bool
+    {
+        return null !== $this->createQueryBuilder('a')
+            ->select('a.id')
+            ->where('a.action = :action AND a.summary = :summary AND a.occurredAt >= :since')
+            ->setParameter('action', $action)
+            ->setParameter('summary', $summary)
+            ->setParameter('since', $since)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }
