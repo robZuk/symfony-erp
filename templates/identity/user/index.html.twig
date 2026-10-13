@@ -65,7 +65,7 @@
                                     {# Not while already working as someone else, and never as a blocked account.
                                         The link goes to the home page: this list is closed to everyone but administrators. #}
                                     {% if user != app.user and user.active and not is_granted('IS_IMPERSONATOR') %}
-                                        <twig:Button as="a" variant="ghost" size="sm" href="{{ path('app_dashboard', {_switch_user: user.email}) }}" title="Zobacz system oczami tego użytkownika">Zaloguj jako</twig:Button>
+                                        <twig:Button as="a" variant="ghost" size="sm" href="{{ path('app_dashboard', {_switch_user: user.email}) }}" title="Zobacz system oczami tego użytkownika">Podszywaj się</twig:Button>
                                     {% endif %}
                                     {% if user != app.user %}
                                         <form method="post" action="{{ path('identity_user_toggle', {id: user.id}) }}">

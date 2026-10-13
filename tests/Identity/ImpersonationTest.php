@@ -29,7 +29,7 @@ final class ImpersonationTest extends WebTestCase
         $this->signInAs($this->client, User::ROLE_ADMIN);
 
         $crawler = $this->client->request('GET', '/admin/users?q=anna');
-        $this->client->click($crawler->selectLink('Zaloguj jako')->link());
+        $this->client->click($crawler->selectLink('Podszywaj się')->link());
         $crawler = $this->client->followRedirect();
 
         // The administrator now sees the system exactly as Anna does
@@ -91,7 +91,7 @@ final class ImpersonationTest extends WebTestCase
 
         // No button on the list...
         $crawler = $this->client->request('GET', '/admin/users?q=anna');
-        self::assertCount(0, $crawler->selectLink('Zaloguj jako'));
+        self::assertCount(0, $crawler->selectLink('Podszywaj się'));
 
         // ...and the address typed by hand does not work either
         $this->client->request('GET', '/?_switch_user=anna@example.com');
@@ -108,6 +108,6 @@ final class ImpersonationTest extends WebTestCase
 
         // Two users are listed, one of them the administrator: exactly one can be impersonated
         self::assertSelectorCount(2, '[data-test="user-row"]');
-        self::assertCount(1, $crawler->selectLink('Zaloguj jako'));
+        self::assertCount(1, $crawler->selectLink('Podszywaj się'));
     }
 }
