@@ -7,6 +7,7 @@ use App\Invoicing\Entity\InvoiceType;
 use App\Invoicing\Entity\Party;
 use App\Invoicing\Entity\PaymentMethod;
 use App\Invoicing\Message\GenerateInvoicePdf;
+use App\Shared\Audit\ActivityLog;
 use App\Shared\Catalog\ProductDirectory;
 use App\Shared\Numbering\DocumentNumberGenerator;
 use App\Shared\Partner\PartnerDirectory;
@@ -34,6 +35,7 @@ final class InvoiceIssuing
         private readonly DocumentNumberGenerator $numbers,
         private readonly MessageBusInterface $bus,
         private readonly ClockInterface $clock,
+        private readonly ActivityLog $activity,
     ) {
     }
 
@@ -89,6 +91,7 @@ final class InvoiceIssuing
 
             // Refuses, and so undoes everything above, if the order was invoiced in the meantime
             $this->orders->markInvoiced($order->id, (int) $invoice->getId(), $invoice->getNumber());
+            $this->activity->record('invoicing.invoice.issued', \sprintf('Wystawiono fakturę %s dla %s.', $invoice->getNumber(), $invoice->getBuyer()->name), 'invoicing_invoice_show', ['id' => (int) $invoice->getId()]);
             $this->queuePdf($invoice);
 
             return $invoice;
@@ -175,6 +178,7 @@ final class InvoiceIssuing
 
             $this->entityManager->persist($correction);
             $this->entityManager->flush();
+            $this->activity->record('invoicing.invoice.corrected', \sprintf('Wystawiono korektę %s do faktury %s.', $correction->getNumber(), $original->getNumber()), 'invoicing_invoice_show', ['id' => (int) $correction->getId()]);
             $this->queuePdf($correction);
 
             return $correction;

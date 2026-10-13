@@ -30,6 +30,11 @@
             {label: 'Stany', route: 'inventory_stock_index', match: 'inventory_stock_', icon: 'lucide:boxes'},
             {label: 'Magazyny', route: 'inventory_warehouse_index', match: 'inventory_warehouse_', icon: 'lucide:warehouse'},
         ]},
+        {label: 'Administracja', role: 'ROLE_ADMIN', items: [
+            {label: 'Użytkownicy', route: 'identity_user_index', match: 'identity_user_', icon: 'lucide:users'},
+            {label: 'Dane firmy', route: 'invoicing_seller', match: 'invoicing_seller', icon: 'lucide:building'},
+            {label: 'Dziennik zdarzeń', route: 'app_activity', match: 'app_activity', icon: 'lucide:scroll-text'},
+        ]},
     ] %}
 
     {# Section of the current page, shown as the first breadcrumb #}
@@ -63,7 +68,8 @@
             </twig:Sidebar:Header>
 
             <twig:Sidebar:Content>
-                {% for group in navigation %}
+                {# A group with a "role" is shown only to users who have it #}
+                {% for group in navigation|filter(group => group.role is not defined or is_granted(group.role)) %}
                     <twig:Sidebar:Group>
                         {% if group.label %}
                             <twig:Sidebar:GroupLabel>{{ group.label }}</twig:Sidebar:GroupLabel>
@@ -108,6 +114,10 @@
                                     </div>
                                 </twig:DropdownMenu:Label>
                                 <twig:DropdownMenu:Separator />
+                                <twig:DropdownMenu:Item as="a" href="{{ path('identity_account') }}">
+                                    <twig:ux:icon name="lucide:circle-user" aria-hidden="true" />
+                                    Moje konto
+                                </twig:DropdownMenu:Item>
                                 <form method="post" action="{{ path('app_logout') }}">
                                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
                                     {# A real submit button, styled like DropdownMenu:Item (which can only be type="button") #}

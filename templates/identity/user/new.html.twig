@@ -1,0 +1,28 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Nowy użytkownik – Mini-ERP{% endblock %}
+{% block heading %}Nowy użytkownik{% endblock %}
+
+{% block page %}
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Content>
+            {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                {{ form_errors(form) }}
+
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.fullName) }}
+                    {{ form_row(form.email) }}
+                </div>
+                {{ form_row(form.roles) }}
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.password) }}
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <twig:Button as="a" variant="outline" href="{{ path('identity_user_index') }}">Anuluj</twig:Button>
+                    <twig:Button type="submit">Załóż konto</twig:Button>
+                </div>
+            {{ form_end(form) }}
+        </twig:Card:Content>
+    </twig:Card>
+{% endblock %}

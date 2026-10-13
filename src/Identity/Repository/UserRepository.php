@@ -3,6 +3,8 @@
 namespace App\Identity\Repository;
 
 use App\Identity\Entity\User;
+use App\Shared\Pagination\Page;
+use App\Shared\Pagination\Paginator;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
@@ -36,5 +38,30 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
         $user->setPassword($newHashedPassword);
         $this->save($user);
+    }
+
+    /**
+     * @param string $status "active", "blocked" or "all"
+     *
+     * @return Page<User>
+     */
+    public function search(string $term, string $status, int $page): Page
+    {
+        $queryBuilder = $this->createQueryBuilder('u')->orderBy('u.fullName', 'ASC')->addOrderBy('u.id', 'ASC');
+
+        if ('' !== trim($term)) {
+            $queryBuilder
+                ->andWhere('LOWER(u.fullName) LIKE :term OR LOWER(u.email) LIKE :term')
+                ->setParameter('term', Paginator::containsPattern($term));
+        }
+
+        if ('all' !== $status) {
+            $queryBuilder->andWhere('u.active = :active')->setParameter('active', 'active' === $status);
+        }
+
+        /** @var Page<User> $result */
+        $result = Paginator::paginate($queryBuilder, $page);
+
+        return $result;
     }
 }

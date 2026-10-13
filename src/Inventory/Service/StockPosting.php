@@ -8,6 +8,7 @@ use App\Inventory\Entity\StockLevel;
 use App\Inventory\Entity\StockMovement;
 use App\Inventory\Entity\Warehouse;
 use App\Inventory\Repository\StockLevelRepository;
+use App\Shared\Audit\ActivityLog;
 use App\Shared\Inventory\InsufficientStock;
 use App\Shared\Numbering\DocumentNumberGenerator;
 use App\Shared\Persistence\Transactional;
@@ -27,6 +28,7 @@ final class StockPosting
         private readonly StockLevelRepository $stockLevels,
         private readonly DocumentNumberGenerator $numbers,
         private readonly ClockInterface $clock,
+        private readonly ActivityLog $activity,
     ) {
     }
 
@@ -86,6 +88,7 @@ final class StockPosting
         }
 
         $document->markPosted($this->numbers->next($document->getType()->value, $document->getDocumentDate()), $now);
+        $this->activity->record('inventory.document.posted', \sprintf('Zaksięgowano dokument %s.', $document->getNumber()), 'inventory_document_show', ['id' => (int) $document->getId()]);
     }
 
     /**

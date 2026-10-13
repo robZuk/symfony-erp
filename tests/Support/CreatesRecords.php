@@ -17,6 +17,7 @@ use App\Sales\Entity\SalesOrder;
 use App\Sales\Repository\SalesOrderRepository;
 use App\Sales\Service\OrderLifecycle;
 use App\Shared\Tax\VatRate;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Shortcuts for putting records into the test database.
@@ -144,5 +145,23 @@ trait CreatesRecords
         $lifecycle->ship($order);
 
         return $order;
+    }
+
+    /**
+     * Loads an entity again. Needed after an HTTP request: the request ends the database session,
+     * so objects fetched before it are no longer tracked.
+     *
+     * @template T of object
+     *
+     * @param T $entity
+     *
+     * @return T
+     */
+    private function reload(object $entity): object
+    {
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $id = $entityManager->getClassMetadata($entity::class)->getIdentifierValues($entity);
+
+        return $entityManager->find($entity::class, $id) ?? throw new \LogicException('The entity no longer exists.');
     }
 }

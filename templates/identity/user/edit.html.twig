@@ -1,0 +1,43 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}{{ user.fullName }} – Mini-ERP{% endblock %}
+{% block heading %}{{ user.fullName }}{% endblock %}
+
+{% block page %}
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Header>
+            <twig:Card:Title>Dane konta</twig:Card:Title>
+            <twig:Card:Description>{{ user.email }}{% if not user.active %} · konto zablokowane{% endif %}</twig:Card:Description>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                {{ form_errors(form) }}
+                {{ form_row(form.fullName) }}
+                {{ form_row(form.roles) }}
+
+                <div class="flex justify-end gap-2">
+                    <twig:Button as="a" variant="outline" href="{{ path('identity_user_index') }}">Anuluj</twig:Button>
+                    <twig:Button type="submit">Zapisz</twig:Button>
+                </div>
+            {{ form_end(form) }}
+        </twig:Card:Content>
+    </twig:Card>
+
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Header>
+            <twig:Card:Title>Nowe hasło</twig:Card:Title>
+            <twig:Card:Description>Dla użytkownika, który zapomniał hasła. Po zmianie zostanie wylogowany na wszystkich urządzeniach.</twig:Card:Description>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            {{ form_start(password_form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(password_form.password.first) }}
+                    {{ form_row(password_form.password.second) }}
+                </div>
+                <div class="flex justify-end">
+                    <twig:Button type="submit" variant="outline">Ustaw hasło</twig:Button>
+                </div>
+            {{ form_end(password_form) }}
+        </twig:Card:Content>
+    </twig:Card>
+{% endblock %}

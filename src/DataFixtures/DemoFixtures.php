@@ -17,6 +17,7 @@ use App\Invoicing\Service\InvoiceIssuing;
 use App\Partner\Entity\Partner;
 use App\Sales\Entity\SalesOrder;
 use App\Sales\Service\OrderLifecycle;
+use App\Shared\Audit\ActivityLog;
 use App\Shared\Tax\VatRate;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
@@ -76,6 +77,9 @@ final class DemoFixtures extends Fixture
 
     private const int MONTHS = 6;
 
+    /** @var array<string, User> the demo users, indexed by role */
+    private array $users = [];
+
     public function __construct(
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly StockPosting $posting,
@@ -83,6 +87,7 @@ final class DemoFixtures extends Fixture
         private readonly InvoiceIssuing $invoicing,
         private readonly GenerateInvoicePdfHandler $pdfHandler,
         private readonly ClockInterface $clock,
+        private readonly ActivityLog $activity,
     ) {
     }
 
@@ -91,7 +96,7 @@ final class DemoFixtures extends Fixture
         // A fixed seed: the "random" choices below come out the same on every run
         mt_srand(2026);
 
-        $this->loadUsers($manager);
+        $this->users = $this->loadUsers($manager);
         [$main, $shop] = $this->loadWarehouses($manager);
         $products = $this->loadProducts($manager);
         [$customers, $suppliers] = $this->loadPartners($manager);
@@ -134,8 +139,9 @@ final class DemoFixtures extends Fixture
         $this->addLooseEnds($manager, $main, $shop, $customers, $suppliers, $products, $goods, $today);
         $manager->flush();
 
-        // Back to the real time
+        // Back to the real time and the real user
         Clock::set(new NativeClock());
+        $this->activity->onBehalfOf(null);
     }
 
     /**
@@ -147,13 +153,28 @@ final class DemoFixtures extends Fixture
         Clock::set(new MockClock($moment));
     }
 
-    private function loadUsers(ObjectManager $manager): void
+    /**
+     * @return array<string, User> indexed by role
+     */
+    private function loadUsers(ObjectManager $manager): array
     {
+        $users = [];
         foreach (self::USERS as $email => [$name, $role, $password]) {
             $user = new User($email, $name, [$role]);
             $user->setPassword($this->passwordHasher->hashPassword($user, $password));
             $manager->persist($user);
+            $users[$role] = $user;
         }
+
+        return $users;
+    }
+
+    /**
+     * Makes the activity log attribute what follows to the demo user with the given role.
+     */
+    private function actAs(string $role): void
+    {
+        $this->activity->onBehalfOf($this->users[$role]);
     }
 
     /**
@@ -248,6 +269,7 @@ final class DemoFixtures extends Fixture
         }
         $manager->persist($document);
         $manager->flush();
+        $this->actAs(User::ROLE_WAREHOUSE);
         $this->posting->post($document);
     }
 
@@ -292,6 +314,7 @@ final class DemoFixtures extends Fixture
         }
 
         try {
+            $this->actAs(User::ROLE_SALES);
             $this->orders->confirm($order);
         } catch (\DomainException) {
             // Not enough stock for this one: it simply stays a draft, as it would in real life
@@ -301,10 +324,13 @@ final class DemoFixtures extends Fixture
             return;
         }
 
+        $this->actAs(User::ROLE_WAREHOUSE);
         $this->orders->ship($order);
         if ('shipped' === $stopAt) {
             return;
         }
+
+        $this->actAs(User::ROLE_ACCOUNTING);
 
         $invoice = $this->invoicing->issueForOrder(
             (int) $order->getId(),
@@ -349,8 +375,10 @@ final class DemoFixtures extends Fixture
         $draft->addLine((int) $goods[8]->getId(), 10000);
         $manager->persist($draft);
         $manager->flush();
+        $this->actAs(User::ROLE_WAREHOUSE);
         $this->posting->post($transfer);
 
+        $this->actAs(User::ROLE_SALES);
         $cancelled = $this->createOrder($manager, $customers[0], $main, $products, $today);
         $this->orders->cancel($cancelled);
 
@@ -365,7 +393,9 @@ final class DemoFixtures extends Fixture
         $manager->persist($returned);
         $manager->flush();
         $this->orders->confirm($returned);
+        $this->actAs(User::ROLE_WAREHOUSE);
         $this->orders->ship($returned);
+        $this->actAs(User::ROLE_ACCOUNTING);
         $invoice = $this->invoicing->issueForOrder((int) $returned->getId(), $today, 14, PaymentMethod::Transfer);
         ($this->pdfHandler)(new GenerateInvoicePdf((int) $invoice->getId()));
 

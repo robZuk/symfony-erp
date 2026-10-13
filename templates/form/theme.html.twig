@@ -92,6 +92,18 @@
     </twig:NativeSelect>
 {%- endblock choice_widget_collapsed -%}
 
+{#- A list of checkboxes (or radios): a ChoiceType with expanded: true. -#}
+{%- block choice_widget_expanded -%}
+    <div class="grid gap-2" id="{{ id }}">
+        {%- for child in form -%}
+            <div class="flex items-center gap-2">
+                {{- form_widget(child) -}}
+                <label for="{{ child.vars.id }}" class="text-sm leading-none select-none">{{ child.vars.label }}</label>
+            </div>
+        {%- endfor -%}
+    </div>
+{%- endblock choice_widget_expanded -%}
+
 {%- block checkbox_row -%}
     <div class="grid gap-2">
         <div class="flex items-center gap-2">

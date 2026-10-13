@@ -1,0 +1,44 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Moje konto – Mini-ERP{% endblock %}
+{% block heading %}Moje konto{% endblock %}
+
+{% block page %}
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Header>
+            <twig:Card:Title>{{ user.fullName }}</twig:Card:Title>
+            <twig:Card:Description>{{ user.email }}</twig:Card:Description>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            <div class="flex flex-wrap items-center gap-1 text-sm">
+                <span class="me-1 text-muted-foreground">Role:</span>
+                {% for role in user.assignedRoles %}
+                    <twig:Badge variant="secondary">{{ constant('App\\Identity\\Entity\\User::ROLE_LABELS')[role] ?? role }}</twig:Badge>
+                {% else %}
+                    <span>tylko podgląd</span>
+                {% endfor %}
+            </div>
+        </twig:Card:Content>
+    </twig:Card>
+
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Header>
+            <twig:Card:Title>Zmiana hasła</twig:Card:Title>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                {{ form_errors(form) }}
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.current) }}
+                </div>
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.password.first) }}
+                    {{ form_row(form.password.second) }}
+                </div>
+                <div class="flex justify-end">
+                    <twig:Button type="submit">Zmień hasło</twig:Button>
+                </div>
+            {{ form_end(form) }}
+        </twig:Card:Content>
+    </twig:Card>
+{% endblock %}

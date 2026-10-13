@@ -24,6 +24,8 @@ Jeden proces, cztery role:
 
 Do tego kartoteki produktów i kontrahentów, przesunięcia między magazynami, historia ruchów każdego produktu i pulpit z tym, co czeka na każdą z ról.
 
+**Administrator** zarządza kontami (zakłada, nadaje role, ustawia hasła, blokuje), zmienia dane firmy drukowane na fakturach i przegląda dziennik zdarzeń: kto i kiedy zaksięgował dokument, potwierdził zamówienie czy wystawił fakturę.
+
 ## Architektura
 
 Każdy moduł leży w `src/<Moduł>` i nie widzi encji pozostałych. Przechowuje tylko ich identyfikatory, a o resztę pyta przez interfejsy z `Shared`, które implementuje moduł-właściciel. Granic pilnuje Deptrac w `make lint`.
@@ -42,14 +44,14 @@ flowchart LR
 
 | Moduł | Zakres |
 |-------|--------|
-| `Identity` | użytkownicy, role, logowanie |
+| `Identity` | logowanie, role, zarządzanie kontami, „Moje konto” |
 | `Catalog` | produkty i usługi, ceny, stawki VAT, stany minimalne |
 | `Partner` | kontrahenci (odbiorcy i dostawcy), walidacja NIP |
 | `Inventory` | magazyny, dokumenty PZ/WZ/MM, rejestr ruchów, stany, rezerwacje |
 | `Sales` | zamówienia sprzedaży i ich cykl życia |
-| `Invoicing` | faktury VAT, korekty, PDF |
-| `Dashboard` | pulpit; jedyny moduł, który czyta ze wszystkich |
-| `Shared` | kontrakty między modułami, `Money`, VAT, numeracja dokumentów, transakcje |
+| `Invoicing` | faktury VAT, korekty, PDF, dane firmy |
+| `Dashboard` | pulpit i dziennik zdarzeń; jedyny moduł, który czyta ze wszystkich |
+| `Shared` | kontrakty między modułami, `Money`, VAT, numeracja dokumentów, transakcje, zapis dziennika zdarzeń |
 
 Kontrakty: `ProductDirectory`, `PartnerDirectory`, `WarehouseDirectory` (odczyt kartotek), `StockReservations` (sprzedaż → magazyn), `BillableOrders` (faktury → sprzedaż).
 
@@ -76,6 +78,13 @@ Kontrakty: `ProductDirectory`, `PartnerDirectory`, `WarehouseDirectory` (odczyt 
 - Faktura korygująca zmniejsza ilości i pokazuje „było / jest / różnica”. Jej VAT to różnica między VAT-em dokumentu przed i po, dzięki czemu faktura i korekty zawsze sumują się co do grosza.
 - PDF generuje worker Messengera. Wiadomość trafia do kolejki w tej samej transakcji bazy co faktura, a strona sama odświeża status, aż plik będzie gotowy.
 
+### Konta i administracja
+
+- Nie ma osobnego modułu „admin”. Każdy moduł dostarcza własne ekrany administracyjne, a menu „Administracja” tylko je grupuje dla roli administratora.
+- Kont się nie usuwa, tylko blokuje: dokumenty i dziennik dalej na nie wskazują. Zablokowany użytkownik nie zaloguje się, a jego trwająca sesja kończy się przy następnym żądaniu. To samo dzieje się po zmianie hasła lub ról.
+- Administrator nie może zablokować siebie ani odebrać sobie roli, a w systemie zawsze zostaje przynajmniej jeden aktywny administrator.
+- Wpis w dzienniku zdarzeń zapisuje się w tej samej transakcji co operacja, więc dziennik nigdy nie wspomina o czymś, co zostało wycofane.
+
 ### Pieniądze i ilości
 
 - Kwoty są liczbami całkowitymi w groszach (`App\Shared\Money\Money`), ilości w tysięcznych częściach jednostki. Żadnych ułamków zmiennoprzecinkowych.
@@ -101,7 +110,7 @@ Tworzy je `make demo`. Proste hasła, tylko do użytku lokalnego.
 
 | Rola | E-mail | Hasło | Co może |
 |---|---|---|---|
-| Administrator | `admin@example.com` | `admin12345` | wszystko |
+| Administrator | `admin@example.com` | `admin12345` | wszystko, w tym konta, dane firmy i dziennik zdarzeń |
 | Magazynier | `magazyn@example.com` | `magazyn12345` | dokumenty magazynowe, wydanie zamówień, produkty |
 | Handlowiec | `sprzedaz@example.com` | `sprzedaz12345` | zamówienia, produkty, kontrahenci |
 | Księgowość | `ksiegowosc@example.com` | `ksiegowosc12345` | faktury i korekty, kontrahenci |

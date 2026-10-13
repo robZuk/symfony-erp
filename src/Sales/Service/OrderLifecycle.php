@@ -3,6 +3,7 @@
 namespace App\Sales\Service;
 
 use App\Sales\Entity\SalesOrder;
+use App\Shared\Audit\ActivityLog;
 use App\Shared\Catalog\ProductDirectory;
 use App\Shared\Inventory\InsufficientStock;
 use App\Shared\Inventory\StockReservations;
@@ -37,6 +38,7 @@ final class OrderLifecycle
         private readonly ProductDirectory $products,
         private readonly DocumentNumberGenerator $numbers,
         private readonly ClockInterface $clock,
+        private readonly ActivityLog $activity,
     ) {
     }
 
@@ -56,6 +58,7 @@ final class OrderLifecycle
             $this->stock->reserve($order->getWarehouseId(), $this->stockQuantities($order));
             $order->assignNumber($this->numbers->next(self::NUMBER_SERIES, $order->getOrderDate()));
             $this->workflow->apply($order, 'confirm');
+            $this->activity->record('sales.order.confirmed', \sprintf('Potwierdzono zamówienie %s.', $order->title()), 'sales_order_show', ['id' => (int) $order->getId()]);
         });
     }
 
@@ -82,6 +85,7 @@ final class OrderLifecycle
 
             $order->recordShipment($this->clock->now(), $document);
             $this->workflow->apply($order, 'ship');
+            $this->activity->record('sales.order.shipped', \sprintf('Wydano zamówienie %s.', $order->title()), 'sales_order_show', ['id' => (int) $order->getId()]);
         });
     }
 
@@ -99,6 +103,7 @@ final class OrderLifecycle
             }
 
             $this->workflow->apply($order, 'cancel');
+            $this->activity->record('sales.order.cancelled', \sprintf('Anulowano zamówienie %s.', $order->title()), 'sales_order_show', ['id' => (int) $order->getId()]);
         });
     }
 

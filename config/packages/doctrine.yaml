@@ -20,6 +20,11 @@ doctrine:
                 is_bundle: false
                 dir: '%kernel.project_dir%/src/Shared/Entity'
                 prefix: 'App\Shared\Entity'
+            SharedAudit:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Shared/Audit'
+                prefix: 'App\Shared\Audit'
             Identity:
                 type: attribute
                 is_bundle: false

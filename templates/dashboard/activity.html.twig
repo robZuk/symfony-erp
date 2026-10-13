@@ -1,0 +1,44 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Dziennik zdarzeń – Mini-ERP{% endblock %}
+{% block heading %}Dziennik zdarzeń{% endblock %}
+
+{% block page %}
+    <form method="get" action="{{ path('app_activity') }}" class="flex flex-wrap items-end gap-2" role="search">
+        <twig:Input type="search" name="q" value="{{ q }}" placeholder="Szukaj w opisie lub po osobie" aria-label="Szukaj" class="w-72" />
+        <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
+    </form>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head class="w-40">Kiedy</twig:Table:Head>
+                    <twig:Table:Head class="w-56">Kto</twig:Table:Head>
+                    <twig:Table:Head>Co</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for entry in page.items %}
+                    <twig:Table:Row data-test="activity-row">
+                        <twig:Table:Cell class="tabular-nums text-muted-foreground">{{ entry.occurredAt|date('d.m.Y H:i') }}</twig:Table:Cell>
+                        <twig:Table:Cell>{{ entry.actorName }}</twig:Table:Cell>
+                        <twig:Table:Cell class="whitespace-normal">
+                            {% if entry.route %}
+                                <a href="{{ path(entry.route, entry.routeParameters) }}" class="underline-offset-4 hover:underline">{{ entry.summary }}</a>
+                            {% else %}
+                                {{ entry.summary }}
+                            {% endif %}
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="3" class="h-24 text-center text-muted-foreground">Brak zdarzeń spełniających kryteria.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <twig:Pager :page="page" route="app_activity" :query="q ? {q: q} : {}" />
+{% endblock %}
