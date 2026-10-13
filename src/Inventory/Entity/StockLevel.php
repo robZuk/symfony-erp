@@ -74,6 +74,27 @@ class StockLevel
     }
 
     /**
+     * Promises part of the available quantity to an order.
+     */
+    public function reserve(int $quantity): void
+    {
+        if ($quantity < 0 || $quantity > $this->available()) {
+            throw new \DomainException('Nie można zarezerwować więcej, niż jest dostępne.');
+        }
+
+        $this->reserved += $quantity;
+    }
+
+    public function release(int $quantity): void
+    {
+        if ($quantity < 0 || $quantity > $this->reserved) {
+            throw new \DomainException('Nie można zwolnić więcej, niż jest zarezerwowane.');
+        }
+
+        $this->reserved -= $quantity;
+    }
+
+    /**
      * @param int $delta positive when goods arrive, negative when they leave
      */
     public function apply(int $delta): void

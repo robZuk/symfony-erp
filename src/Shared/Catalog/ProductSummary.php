@@ -2,6 +2,8 @@
 
 namespace App\Shared\Catalog;
 
+use App\Shared\Tax\VatRate;
+
 /**
  * What other modules may know about a product.
  */
@@ -15,6 +17,9 @@ final readonly class ProductSummary
         /** False for services, which never enter a warehouse. */
         public bool $stockKept,
         public bool $active,
+        /** Catalog net price for one unit, in grosze. */
+        public int $netPrice,
+        public VatRate $vatRate,
     ) {
     }
 

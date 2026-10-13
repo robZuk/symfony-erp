@@ -1,0 +1,145 @@
+{% extends 'layout.html.twig' %}
+
+{% set totals = order.totals %}
+{% set status = order.status.value %}
+
+{% block title %}{{ order.title }} – Mini-ERP{% endblock %}
+{% block heading %}{{ order.title }}{% endblock %}
+
+{% block page %}
+    <twig:Card>
+        <twig:Card:Header>
+            <twig:Card:Title class="flex items-center gap-2">
+                Zamówienie sprzedaży
+                <twig:Badge variant="{{ status in ['draft', 'cancelled'] ? 'outline' : 'secondary' }}" data-test="order-status">{{ order.status.label }}</twig:Badge>
+            </twig:Card:Title>
+            <twig:Card:Description>
+                {% if status == 'draft' %}
+                    Szkic niczego nie rezerwuje. Potwierdzenie nada numer i zarezerwuje towar w magazynie.
+                {% elseif status == 'confirmed' %}
+                    Towar jest zarezerwowany i czeka na wydanie z magazynu.
+                {% elseif status == 'shipped' %}
+                    Towar został wydany.
+                {% elseif status == 'cancelled' %}
+                    Zamówienie anulowane.
+                {% endif %}
+            </twig:Card:Description>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            <dl class="grid gap-4 text-sm sm:grid-cols-4">
+                <div>
+                    <dt class="text-muted-foreground">Odbiorca</dt>
+                    <dd class="font-medium">{{ customer.name ?? '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-muted-foreground">Wydanie z magazynu</dt>
+                    <dd class="font-medium">{{ warehouse ? warehouse.label : '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-muted-foreground">Data zamówienia</dt>
+                    <dd class="font-medium">{{ order.orderDate|date('d.m.Y') }}</dd>
+                </div>
+                {% if order.shipmentNumber %}
+                    <div>
+                        <dt class="text-muted-foreground">Dokument wydania</dt>
+                        <dd class="font-medium">
+                            <a href="{{ path('inventory_document_show', {id: order.shipmentDocumentId}) }}" class="underline underline-offset-4" data-test="shipment-link">{{ order.shipmentNumber }}</a>
+                        </dd>
+                    </div>
+                {% endif %}
+                {% if order.note %}
+                    <div class="sm:col-span-4">
+                        <dt class="text-muted-foreground">Uwagi</dt>
+                        <dd class="whitespace-pre-line">{{ order.note }}</dd>
+                    </div>
+                {% endif %}
+            </dl>
+        </twig:Card:Content>
+    </twig:Card>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head class="w-12">Lp.</twig:Table:Head>
+                    <twig:Table:Head>Indeks</twig:Table:Head>
+                    <twig:Table:Head>Nazwa</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Ilość</twig:Table:Head>
+                    <twig:Table:Head>J.m.</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Cena netto</twig:Table:Head>
+                    <twig:Table:Head class="text-end">VAT</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Wartość netto</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for line in order.lines %}
+                    {% set product = products[line.productId] ?? null %}
+                    {% set position = loop.index %}
+                    <twig:Table:Row data-test="line-row">
+                        <twig:Table:Cell>{{ position }}</twig:Table:Cell>
+                        <twig:Table:Cell class="font-mono">{{ product.sku ?? ('#' ~ line.productId) }}</twig:Table:Cell>
+                        <twig:Table:Cell class="font-medium">{{ product.name ?? '—' }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ line.quantity|quantity }}</twig:Table:Cell>
+                        <twig:Table:Cell>{{ product.unit ?? '' }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ line.unitNetPrice|money }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end">{{ line.vatRate.label }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ line.netValue|money }}</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <table class="text-sm">
+            <thead>
+                <tr class="text-muted-foreground">
+                    <th class="pe-6 text-start font-normal">Stawka</th>
+                    <th class="pe-6 text-end font-normal">Netto</th>
+                    <th class="pe-6 text-end font-normal">VAT</th>
+                    <th class="text-end font-normal">Brutto</th>
+                </tr>
+            </thead>
+            <tbody class="tabular-nums">
+                {% for row in totals.rows %}
+                    <tr data-test="vat-row">
+                        <td class="pe-6">{{ row.rate.label }}</td>
+                        <td class="pe-6 text-end">{{ row.net|money }}</td>
+                        <td class="pe-6 text-end">{{ row.vat|money }}</td>
+                        <td class="text-end">{{ row.gross|money }}</td>
+                    </tr>
+                {% endfor %}
+                <tr class="font-semibold">
+                    <td class="pe-6 pt-1">Razem</td>
+                    <td class="pe-6 pt-1 text-end" data-test="order-net">{{ totals.net|money }}</td>
+                    <td class="pe-6 pt-1 text-end" data-test="order-vat">{{ totals.vat|money }}</td>
+                    <td class="pt-1 text-end" data-test="order-gross">{{ totals.gross|money }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="flex flex-wrap justify-end gap-2">
+            {% if is_granted('ROLE_SALES_EDIT') and workflow_can(order, 'cancel') %}
+                <form method="post" action="{{ path('sales_order_cancel', {id: order.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
+                    <twig:Button type="submit" variant="destructive">Anuluj zamówienie</twig:Button>
+                </form>
+            {% endif %}
+            {% if is_granted('ROLE_SALES_EDIT') and order.draft %}
+                <twig:Button as="a" variant="outline" href="{{ path('sales_order_edit', {id: order.id}) }}">Edytuj</twig:Button>
+            {% endif %}
+            {% if is_granted('ROLE_SALES_EDIT') and workflow_can(order, 'confirm') %}
+                <form method="post" action="{{ path('sales_order_confirm', {id: order.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
+                    <twig:Button type="submit">Potwierdź</twig:Button>
+                </form>
+            {% endif %}
+            {% if is_granted('ROLE_INVENTORY_EDIT') and workflow_can(order, 'ship') %}
+                <form method="post" action="{{ path('sales_order_ship', {id: order.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
+                    <twig:Button type="submit">Wydaj z magazynu</twig:Button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

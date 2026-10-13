@@ -28,8 +28,8 @@ final class QuantityType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
+        // No fixed "scale": a whole quantity is shown as "2", not "2,000"
         $resolver->setDefaults([
-            'scale' => 3,
             'invalid_message' => 'Podaj ilość, np. 2 albo 2,5.',
         ]);
     }

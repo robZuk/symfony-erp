@@ -43,6 +43,11 @@ final class DoctrineProductDirectory implements ProductDirectory
         return array_map(self::summarize(...), $products);
     }
 
+    public function sellable(): array
+    {
+        return array_map(self::summarize(...), $this->products->findBy(['active' => true], ['name' => 'ASC']));
+    }
+
     public function idsMatching(string $term): array
     {
         /** @var list<int> $ids */
@@ -65,6 +70,8 @@ final class DoctrineProductDirectory implements ProductDirectory
             $product->getUnit()->label(),
             ProductKind::Goods === $product->getKind(),
             $product->isActive(),
+            $product->getNetPrice(),
+            $product->getVatRate(),
         );
     }
 }

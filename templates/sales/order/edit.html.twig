@@ -1,0 +1,10 @@
+{% extends 'layout.html.twig' %}
+
+{% set heading = order ? 'Edycja zamówienia' : 'Nowe zamówienie' %}
+
+{% block title %}{{ heading }} – Mini-ERP{% endblock %}
+{% block heading %}{{ heading }}{% endblock %}
+
+{% block page %}
+    <twig:Sales:OrderEditor :orderId="order ? order.id : null" />
+{% endblock %}

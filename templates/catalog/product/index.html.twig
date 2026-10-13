@@ -44,7 +44,7 @@
                         <twig:Table:Cell class="font-medium">{{ product.name }}</twig:Table:Cell>
                         <twig:Table:Cell>{{ product.kind.label }}</twig:Table:Cell>
                         <twig:Table:Cell>{{ product.unit.label }}</twig:Table:Cell>
-                        <twig:Table:Cell class="text-end tabular-nums">{{ (product.netPrice / 100)|format_currency('PLN') }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ product.netPrice|money }}</twig:Table:Cell>
                         <twig:Table:Cell class="text-end">{{ product.vatRate.label }}</twig:Table:Cell>
                         <twig:Table:Cell>
                             {% if product.active %}

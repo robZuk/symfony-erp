@@ -1,0 +1,30 @@
+framework:
+    workflows:
+        # Life of a sales order. The side effects of each step are in App\Sales\Service\OrderLifecycle.
+        sales_order:
+            type: state_machine
+            marking_store:
+                type: method
+                property: status
+            supports:
+                - App\Sales\Entity\SalesOrder
+            initial_marking: draft
+            places:
+                - draft
+                - confirmed
+                - shipped
+                - invoiced
+                - cancelled
+            transitions:
+                confirm:
+                    from: draft
+                    to: confirmed
+                ship:
+                    from: confirmed
+                    to: shipped
+                invoice:
+                    from: shipped
+                    to: invoiced
+                cancel:
+                    from: [draft, confirmed]
+                    to: cancelled

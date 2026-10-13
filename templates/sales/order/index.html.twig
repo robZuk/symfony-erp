@@ -1,0 +1,64 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Zamówienia – Mini-ERP{% endblock %}
+{% block heading %}Zamówienia sprzedaży{% endblock %}
+
+{% block page %}
+    <div class="flex flex-wrap items-end justify-between gap-2">
+        <form method="get" action="{{ path('sales_order_index') }}" class="flex flex-wrap items-end gap-2" role="search">
+            <twig:Input type="search" name="q" value="{{ filter.q }}" placeholder="Szukaj po numerze" aria-label="Szukaj" class="w-48" />
+            <twig:NativeSelect size="sm" name="status" aria-label="Status">
+                <option value="">Wszystkie statusy</option>
+                {% for value, label in {draft: 'Szkice', confirmed: 'Potwierdzone', shipped: 'Wydane', invoiced: 'Zafakturowane', cancelled: 'Anulowane'} %}
+                    <option value="{{ value }}"{{ filter.status == value ? ' selected' }}>{{ label }}</option>
+                {% endfor %}
+            </twig:NativeSelect>
+            <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
+        </form>
+
+        {% if is_granted('ROLE_SALES_EDIT') %}
+            <twig:Button as="a" href="{{ path('sales_order_new') }}">
+                <twig:ux:icon name="lucide:plus" data-icon="inline-start" aria-hidden="true" />
+                Nowe zamówienie
+            </twig:Button>
+        {% endif %}
+    </div>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head>Numer</twig:Table:Head>
+                    <twig:Table:Head>Data</twig:Table:Head>
+                    <twig:Table:Head>Odbiorca</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Netto</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Brutto</twig:Table:Head>
+                    <twig:Table:Head>Status</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for order in page.items %}
+                    {% set totals = order.totals %}
+                    <twig:Table:Row data-test="order-row">
+                        <twig:Table:Cell class="font-medium">
+                            <a href="{{ path('sales_order_show', {id: order.id}) }}" class="underline-offset-4 hover:underline">{{ order.title }}</a>
+                        </twig:Table:Cell>
+                        <twig:Table:Cell>{{ order.orderDate|date('d.m.Y') }}</twig:Table:Cell>
+                        <twig:Table:Cell>{{ customers[order.customerId].name ?? '—' }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ totals.net|money }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ totals.gross|money }}</twig:Table:Cell>
+                        <twig:Table:Cell>
+                            <twig:Badge variant="{{ order.status.value in ['draft', 'cancelled'] ? 'outline' : 'secondary' }}">{{ order.status.label }}</twig:Badge>
+                        </twig:Table:Cell>
+                    </twig:Table:Row>
+                {% else %}
+                    <twig:Table:Row>
+                        <twig:Table:Cell colspan="6" class="h-24 text-center text-muted-foreground">Brak zamówień spełniających kryteria.</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <twig:Pager :page="page" route="sales_order_index" :query="filter.toQuery()" />
+{% endblock %}

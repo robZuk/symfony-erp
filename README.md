@@ -19,7 +19,7 @@ Projekt w budowie — moduły powstają etapami.
 
 Każdy moduł leży w `src/<Moduł>` i może zależeć tylko od `Shared` (wyjątkiem jest `Dashboard`). Granic pilnuje Deptrac (`deptrac.yaml`).
 
-Moduły nie sięgają do swoich encji nawzajem. Magazyn przechowuje tylko identyfikatory produktów i kontrahentów, a o resztę pyta przez interfejsy z `Shared` (`ProductDirectory`, `PartnerDirectory`), które implementują moduły-właściciele.
+Moduły nie sięgają do swoich encji nawzajem. Magazyn przechowuje tylko identyfikatory produktów i kontrahentów, a o resztę pyta przez interfejsy z `Shared` (`ProductDirectory`, `PartnerDirectory`, `WarehouseDirectory`), które implementują moduły-właściciele.
 
 ## Magazyn
 
@@ -30,6 +30,15 @@ Moduły nie sięgają do swoich encji nawzajem. Magazyn przechowuje tylko identy
 - Ilości są przechowywane jako liczby całkowite w tysięcznych częściach jednostki, a kwoty w groszach.
 
 Blokady i numeracja korzystają ze składni PostgreSQL (`INSERT … ON CONFLICT`).
+
+## Sprzedaż
+
+- Zamówienie przechodzi przez statusy opisane w workflow `sales_order` (`config/packages/workflow.yaml`): szkic → potwierdzone → wydane → zafakturowane, z możliwością anulowania przed wydaniem.
+- Potwierdzenie nadaje numer (`ZS/2026/10/0001`) i rezerwuje towar; zarezerwowanego towaru nie da się wydać ani obiecać komuś innemu. Wydanie zamienia rezerwację w zaksięgowany dokument WZ. Anulowanie zwalnia rezerwację.
+- Każdy krok to jedna transakcja obejmująca zamówienie i magazyn (`OrderLifecycle`). Sprzedaż rozmawia z magazynem przez interfejs `StockReservations` z `Shared`.
+- Handlowiec potwierdza i anuluje, magazynier wydaje.
+- Formularz zamówienia to Live Component (`App\Sales\Twig\OrderEditor`): pozycje, ceny z kartoteki i sumy odświeżają się po stronie serwera, bez własnego JavaScriptu.
+- Ceny i stawki VAT są kopiowane na pozycję, więc późniejsze zmiany w kartotece nie zmieniają zamówienia. VAT jest liczony od sumy netto w każdej stawce.
 
 ## Uruchomienie
 

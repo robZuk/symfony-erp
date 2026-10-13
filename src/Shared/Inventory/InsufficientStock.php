@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Inventory\Exception;
+namespace App\Shared\Inventory;
 
 /**
  * Thrown when a document would take more out of a warehouse than is available there.

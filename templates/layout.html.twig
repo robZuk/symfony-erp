@@ -48,6 +48,19 @@
                     </twig:Sidebar:GroupContent>
                 </twig:Sidebar:Group>
                 <twig:Sidebar:Group>
+                    <twig:Sidebar:GroupLabel>Sprzedaż</twig:Sidebar:GroupLabel>
+                    <twig:Sidebar:GroupContent>
+                        <twig:Sidebar:Menu>
+                            <twig:Sidebar:MenuItem>
+                                <twig:Sidebar:MenuButton as="a" href="{{ path('sales_order_index') }}" active="{{ current_route starts with 'sales_order_' }}">
+                                    <twig:ux:icon name="lucide:shopping-cart" aria-hidden="true" />
+                                    <span>Zamówienia</span>
+                                </twig:Sidebar:MenuButton>
+                            </twig:Sidebar:MenuItem>
+                        </twig:Sidebar:Menu>
+                    </twig:Sidebar:GroupContent>
+                </twig:Sidebar:Group>
+                <twig:Sidebar:Group>
                     <twig:Sidebar:GroupLabel>Magazyn</twig:Sidebar:GroupLabel>
                     <twig:Sidebar:GroupContent>
                         <twig:Sidebar:Menu>

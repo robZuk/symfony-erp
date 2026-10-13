@@ -7,9 +7,10 @@ use App\Inventory\Entity\StockDocument;
 use App\Inventory\Entity\StockLevel;
 use App\Inventory\Entity\StockMovement;
 use App\Inventory\Entity\Warehouse;
-use App\Inventory\Exception\InsufficientStock;
 use App\Inventory\Repository\StockLevelRepository;
+use App\Shared\Inventory\InsufficientStock;
 use App\Shared\Numbering\DocumentNumberGenerator;
+use App\Shared\Persistence\Transactional;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
@@ -22,6 +23,7 @@ final class StockPosting
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly Transactional $transactional,
         private readonly StockLevelRepository $stockLevels,
         private readonly DocumentNumberGenerator $numbers,
         private readonly ClockInterface $clock,
@@ -34,24 +36,7 @@ final class StockPosting
      */
     public function post(StockDocument $document): void
     {
-        $connection = $this->entityManager->getConnection();
-        $connection->beginTransaction();
-
-        try {
-            $this->postInTransaction($document);
-            $this->entityManager->flush();
-            $connection->commit();
-        } catch (\DomainException $exception) {
-            // A business rule said no before anything was changed, so the entity manager stays usable
-            $connection->rollBack();
-
-            throw $exception;
-        } catch (\Throwable $exception) {
-            $connection->rollBack();
-            $this->entityManager->close();
-
-            throw $exception;
-        }
+        $this->transactional->run(fn () => $this->postInTransaction($document));
     }
 
     private function postInTransaction(StockDocument $document): void

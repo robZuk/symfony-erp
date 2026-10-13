@@ -25,6 +25,13 @@ interface ProductDirectory
     public function stockKept(): array;
 
     /**
+     * Active products that can be sold, goods and services alike, ordered by name.
+     *
+     * @return list<ProductSummary>
+     */
+    public function sellable(): array;
+
+    /**
      * Ids of products whose name or SKU contains the term.
      *
      * @return list<int>

@@ -1,0 +1,101 @@
+{# Template of the Sales:OrderEditor Live Component (App\Sales\Twig\OrderEditor). #}
+<div {{ attributes }}>
+    {{ form_start(form, {attr: {
+        class: 'grid gap-4',
+        novalidate: 'novalidate',
+        'data-action': 'live#action:prevent',
+        'data-live-action-param': 'save',
+    }}) }}
+        {{ form_errors(form) }}
+
+        <twig:Card>
+            <twig:Card:Content class="grid gap-6">
+                <div class="grid gap-6 sm:grid-cols-3">
+                    {{ form_row(form.customerId) }}
+                    {{ form_row(form.warehouseId) }}
+                    {{ form_row(form.orderDate) }}
+                </div>
+                {{ form_row(form.note) }}
+            </twig:Card:Content>
+        </twig:Card>
+
+        <twig:Card>
+            <twig:Card:Header>
+                <twig:Card:Title>Pozycje</twig:Card:Title>
+                <twig:Card:Description>Po wybraniu produktu cena i stawka VAT są pobierane z kartoteki. Możesz je zmienić dla tego zamówienia.</twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content class="grid gap-4">
+                {{ form_errors(form.lines) }}
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-start font-medium">
+                                <th class="pb-2 text-start font-medium">Produkt</th>
+                                <th class="w-28 pb-2 ps-2 text-start font-medium">Ilość</th>
+                                <th class="w-40 pb-2 ps-2 text-start font-medium">Cena netto</th>
+                                <th class="w-28 pb-2 ps-2 text-start font-medium">VAT</th>
+                                <th class="w-32 pb-2 ps-2 text-end font-medium">Wartość netto</th>
+                                <th class="w-20 pb-2"><span class="sr-only">Akcje</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in form.lines %}
+                                {% set net_value = line.vars.data ? line.vars.data.netValue : null %}
+                                <tr class="align-top" data-test="editor-line">
+                                    <td class="py-1">
+                                        {{ form_widget(line.productId, {attr: {'aria-label': 'Produkt'}}) }}
+                                        {{ form_errors(line.productId) }}
+                                        {{ form_widget(line.pricedFor) }}
+                                    </td>
+                                    <td class="py-1 ps-2">
+                                        {{ form_widget(line.quantity, {attr: {'aria-label': 'Ilość'}}) }}
+                                        {{ form_errors(line.quantity) }}
+                                    </td>
+                                    <td class="py-1 ps-2">
+                                        {{ form_widget(line.unitNetPrice, {attr: {'aria-label': 'Cena netto'}}) }}
+                                        {{ form_errors(line.unitNetPrice) }}
+                                    </td>
+                                    <td class="py-1 ps-2">
+                                        {{ form_widget(line.vatRate, {attr: {'aria-label': 'Stawka VAT'}}) }}
+                                        {{ form_errors(line.vatRate) }}
+                                    </td>
+                                    <td class="py-1 ps-2 pt-2.5 text-end tabular-nums" data-test="editor-line-net">
+                                        {{ net_value ? net_value|money : '—' }}
+                                    </td>
+                                    <td class="py-1 ps-2 text-end">
+                                        {{ form_widget(line.vars.button_delete, {attr: {variant: 'ghost'}}) }}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="py-6 text-center text-muted-foreground">Zamówienie nie ma jeszcze pozycji.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div>{{ form_widget(form.lines.vars.button_add) }}</div>
+                {% do form.lines.setRendered %}
+            </twig:Card:Content>
+        </twig:Card>
+
+        {% set totals = this.totals %}
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <dl class="grid grid-cols-[auto_auto] gap-x-6 gap-y-1 text-sm" data-loading="addClass(opacity-50)">
+                <dt class="text-muted-foreground">Netto</dt>
+                <dd class="text-end tabular-nums" data-test="editor-net">{{ totals.net|money }}</dd>
+                <dt class="text-muted-foreground">VAT</dt>
+                <dd class="text-end tabular-nums" data-test="editor-vat">{{ totals.vat|money }}</dd>
+                <dt class="font-semibold">Brutto</dt>
+                <dd class="text-end font-semibold tabular-nums" data-test="editor-gross">{{ totals.gross|money }}</dd>
+            </dl>
+
+            <div class="flex gap-2">
+                <twig:Button as="a" variant="outline" href="{{ orderId ? path('sales_order_show', {id: orderId}) : path('sales_order_index') }}">Anuluj</twig:Button>
+                <twig:Button type="submit" data-loading="action(save)|addAttribute(disabled)">Zapisz zamówienie</twig:Button>
+            </div>
+        </div>
+    {{ form_end(form) }}
+</div>

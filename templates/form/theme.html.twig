@@ -48,6 +48,24 @@
     </div>
 {%- endblock money_widget -%}
 
+{%- block hidden_widget -%}
+    <input type="hidden" id="{{ id }}" name="{{ full_name }}" value="{{ value }}">
+{%- endblock hidden_widget -%}
+
+{#- Buttons that belong to a form, such as "add" and "remove" in a LiveCollectionType.
+    Pass attr.variant or attr.size to change the look. -#}
+{%- block button_widget -%}
+    <twig:Button
+        type="{{ type|default('button') }}"
+        id="{{ id }}"
+        name="{{ full_name }}"
+        variant="{{ attr.variant|default('outline') }}"
+        size="{{ attr.size|default('default') }}"
+        :disabled="disabled"
+        {{ ...attr|filter((value, key) => key not in ['variant', 'size']) }}
+    >{{ label is same as(false) or label is empty ? name|humanize : label }}</twig:Button>
+{%- endblock button_widget -%}
+
 {%- block choice_widget_collapsed -%}
     <twig:NativeSelect
         class="w-full"
