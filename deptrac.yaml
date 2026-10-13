@@ -1,0 +1,38 @@
+# Module boundaries. A module may use Shared and nothing else, unless listed in the ruleset.
+# Cross-module communication goes through events, so allowed dependencies are added
+# here explicitly, one at a time, as the modules are built.
+deptrac:
+    paths:
+        - ./src
+    exclude_files:
+        - '#src/Kernel\.php$#'
+    layers:
+        - name: Shared
+          collectors:
+              - { type: classLike, value: '^App\\Shared\\.*' }
+        - name: Identity
+          collectors:
+              - { type: classLike, value: '^App\\Identity\\.*' }
+        - name: Catalog
+          collectors:
+              - { type: classLike, value: '^App\\Catalog\\.*' }
+        - name: Partner
+          collectors:
+              - { type: classLike, value: '^App\\Partner\\.*' }
+        - name: Inventory
+          collectors:
+              - { type: classLike, value: '^App\\Inventory\\.*' }
+        - name: Sales
+          collectors:
+              - { type: classLike, value: '^App\\Sales\\.*' }
+        - name: Invoicing
+          collectors:
+              - { type: classLike, value: '^App\\Invoicing\\.*' }
+    ruleset:
+        Shared: ~
+        Identity: [Shared]
+        Catalog: [Shared]
+        Partner: [Shared]
+        Inventory: [Shared]
+        Sales: [Shared]
+        Invoicing: [Shared]

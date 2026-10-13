@@ -13,13 +13,38 @@ doctrine:
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         auto_mapping: true
+        # One mapping per module: entities live in src/<Module>/Entity
         mappings:
-            App:
+            Identity:
                 type: attribute
                 is_bundle: false
-                dir: '%kernel.project_dir%/src/Entity'
-                prefix: 'App\Entity'
-                alias: App
+                dir: '%kernel.project_dir%/src/Identity/Entity'
+                prefix: 'App\Identity\Entity'
+            Catalog:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Catalog/Entity'
+                prefix: 'App\Catalog\Entity'
+            Partner:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Partner/Entity'
+                prefix: 'App\Partner\Entity'
+            Inventory:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Inventory/Entity'
+                prefix: 'App\Inventory\Entity'
+            Sales:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Sales/Entity'
+                prefix: 'App\Sales\Entity'
+            Invoicing:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Invoicing/Entity'
+                prefix: 'App\Invoicing\Entity'
 
 when@test:
     doctrine:

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+jobs:
+    ci:
+        runs-on: ubuntu-latest
+        services:
+            database:
+                image: postgres:16-alpine
+                env:
+                    POSTGRES_DB: app
+                    POSTGRES_USER: app
+                    POSTGRES_PASSWORD: '!ChangeMe!'
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -d app -U app"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 10
+        env:
+            DATABASE_URL: 'postgresql://app:!ChangeMe!@127.0.0.1:5432/app?serverVersion=16&charset=utf8'
+        steps:
+            - uses: actions/checkout@v4
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.5'
+                  extensions: intl, pdo_pgsql
+                  coverage: none
+            - run: composer install --no-interaction --no-progress
+            - run: make lint CONSOLE="php bin/console" PHP=php
+            - run: make test CONSOLE="php bin/console" PHP=php
