@@ -11,6 +11,7 @@ use App\Inventory\Form\StockDocumentType;
 use App\Inventory\Repository\StockDocumentRepository;
 use App\Inventory\Repository\WarehouseRepository;
 use App\Inventory\Service\StockPosting;
+use App\Shared\Audit\ActivityLog;
 use App\Shared\Catalog\ProductDirectory;
 use App\Shared\Inventory\InsufficientStock;
 use App\Shared\Partner\PartnerDirectory;
@@ -36,6 +37,7 @@ final class StockDocumentController extends AbstractController
         private readonly ProductDirectory $products,
         private readonly PartnerDirectory $partners,
         private readonly ClockInterface $clock,
+        private readonly ActivityLog $activity,
     ) {
     }
 
@@ -75,6 +77,7 @@ final class StockDocumentController extends AbstractController
             $document->setPartnerId($header->partnerId);
             $document->setNote($header->note);
             $this->documents->save($document);
+            $this->log('drafted', \sprintf('Utworzono dokument %s.', $document->title()), $document);
 
             return $this->redirectToShow($document);
         }
@@ -108,6 +111,7 @@ final class StockDocumentController extends AbstractController
         try {
             $document->addLine($line['productId'], $line['quantity']);
             $this->documents->save($document);
+            $this->log('line_added', \sprintf('Dodano pozycję %s do dokumentu %s.', $this->products->find($line['productId'])->sku ?? '#'.$line['productId'], $document->title()), $document);
         } catch (\DomainException $exception) {
             $this->addFlash('error', $exception->getMessage());
         }
@@ -128,6 +132,7 @@ final class StockDocumentController extends AbstractController
             try {
                 $document->removeLine($line);
                 $this->documents->save($document);
+                $this->log('line_removed', \sprintf('Usunięto pozycję %s z dokumentu %s.', $this->products->find($line->getProductId())->sku ?? '#'.$line->getProductId(), $document->title()), $document);
             } catch (\DomainException $exception) {
                 $this->addFlash('error', $exception->getMessage());
             }
@@ -166,8 +171,12 @@ final class StockDocumentController extends AbstractController
     #[IsCsrfTokenValid(self::CSRF_TOKEN)]
     public function delete(StockDocument $document): Response
     {
+        // The title contains the id, which is gone once the document is removed
+        $title = $document->title();
+
         try {
             $this->documents->remove($document);
+            $this->activity->record('inventory.document.deleted', \sprintf('Usunięto dokument %s.', $title));
             $this->addFlash('success', 'Usunięto szkic dokumentu.');
         } catch (\DomainException $exception) {
             $this->addFlash('error', $exception->getMessage());
@@ -207,6 +216,7 @@ final class StockDocumentController extends AbstractController
         }
 
         $this->documents->save($correction);
+        $this->log('drafted', \sprintf('Utworzono dokument %s jako korektę dokumentu %s.', $correction->title(), $document->getNumber()), $correction);
         $this->addFlash('success', 'Utworzono szkic korekty. Sprawdź pozycje i zaksięguj.');
 
         return $this->redirectToShow($correction);
@@ -229,6 +239,11 @@ final class StockDocumentController extends AbstractController
             'line_form' => $lineForm,
             'csrf_token_id' => self::CSRF_TOKEN,
         ]);
+    }
+
+    private function log(string $what, string $summary, StockDocument $document): void
+    {
+        $this->activity->record('inventory.document.'.$what, $summary, 'inventory_document_show', ['id' => (int) $document->getId()]);
     }
 
     private function redirectToShow(StockDocument $document): Response

@@ -2,6 +2,7 @@
 
 namespace App\Invoicing\Entity;
 
+use App\Shared\Audit\Audited;
 use App\Shared\Validator\Nip;
 use App\Shared\Validator\NipValidator;
 use Doctrine\ORM\Mapping as ORM;
@@ -13,7 +14,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'invoicing_seller')]
-class Seller
+class Seller implements Audited
 {
     public const int ID = 1;
 
@@ -110,5 +111,32 @@ class Seller
     {
         $bankAccount = trim((string) $bankAccount);
         $this->bankAccount = '' === $bankAccount ? null : $bankAccount;
+    }
+
+    public static function auditCode(): string
+    {
+        return 'invoicing.seller';
+    }
+
+    public function auditLabel(): string
+    {
+        return 'dane firmy';
+    }
+
+    public static function auditFields(): array
+    {
+        return [
+            'name' => 'nazwa',
+            'nip' => 'NIP',
+            'street' => 'ulica',
+            'postalCode' => 'kod pocztowy',
+            'city' => 'miejscowość',
+            'bankAccount' => 'rachunek bankowy',
+        ];
+    }
+
+    public function auditRoute(): ?array
+    {
+        return ['invoicing_seller', []];
     }
 }

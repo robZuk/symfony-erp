@@ -3,6 +3,7 @@
 namespace App\Catalog\Entity;
 
 use App\Catalog\Repository\ProductRepository;
+use App\Shared\Audit\Audited;
 use App\Shared\Tax\VatRate;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
@@ -11,7 +12,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'catalog_product')]
 #[UniqueEntity('sku', message: 'Produkt o tym indeksie już istnieje.')]
-class Product
+class Product implements Audited
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -137,5 +138,34 @@ class Product
     public function setActive(bool $active): void
     {
         $this->active = $active;
+    }
+
+    public static function auditCode(): string
+    {
+        return 'catalog.product';
+    }
+
+    public function auditLabel(): string
+    {
+        return \sprintf('produkt %s', $this->sku);
+    }
+
+    public static function auditFields(): array
+    {
+        return [
+            'sku' => 'indeks',
+            'name' => 'nazwa',
+            'kind' => 'rodzaj',
+            'unit' => 'jednostka',
+            'netPrice' => ['cena netto', 'money'],
+            'vatRate' => 'stawka VAT',
+            'minimumStock' => ['stan minimalny', 'quantity'],
+            'active' => 'aktywny',
+        ];
+    }
+
+    public function auditRoute(): ?array
+    {
+        return ['catalog_product_edit', ['id' => (int) $this->id]];
     }
 }

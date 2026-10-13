@@ -7,6 +7,8 @@ use App\Identity\Entity\User;
 use App\Sales\Entity\OrderStatus;
 use App\Sales\Entity\SalesOrder;
 use App\Sales\Repository\SalesOrderRepository;
+use App\Shared\Audit\ActivityEntry;
+use App\Shared\Audit\ActivityEntryRepository;
 use App\Shared\Tax\VatRate;
 use App\Tests\Support\CreatesRecords;
 use App\Tests\Support\SignsIn;
@@ -96,6 +98,10 @@ final class OrderTest extends WebTestCase
         // 2,5 x 49,90 = 124,75 at 23% = 28,69; 1 x 100,00 at 8% = 8,00
         self::assertSame(22475, $order->totals()->net()->minor);
         self::assertSame(3669, $order->totals()->vat()->minor);
+
+        $logged = self::getContainer()->get(ActivityEntryRepository::class)->findOneBy(['action' => 'sales.order.drafted']);
+        self::assertInstanceOf(ActivityEntry::class, $logged);
+        self::assertSame($user->getId(), $logged->getActorId());
 
         $this->client->request('GET', \sprintf('/sales/orders/%d', $order->getId()));
         self::assertSelectorTextContains('[data-test="order-status"]', 'Szkic');

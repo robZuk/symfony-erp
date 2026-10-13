@@ -6,6 +6,12 @@
 {% block page %}
     <form method="get" action="{{ path('app_activity') }}" class="flex flex-wrap items-end gap-2" role="search">
         <twig:Input type="search" name="q" value="{{ q }}" placeholder="Szukaj w opisie lub po osobie" aria-label="Szukaj" class="w-72" />
+        <twig:NativeSelect size="sm" name="area" aria-label="Obszar">
+            <option value="">Wszystkie obszary</option>
+            {% for code, label in areas %}
+                <option value="{{ code }}"{{ area == code ? ' selected' }}>{{ label }}</option>
+            {% endfor %}
+        </twig:NativeSelect>
         <twig:Button type="submit" variant="outline">Szukaj</twig:Button>
     </form>
 
@@ -40,5 +46,5 @@
         </twig:Table>
     </twig:Card>
 
-    <twig:Pager :page="page" route="app_activity" :query="q ? {q: q} : {}" />
+    <twig:Pager :page="page" route="app_activity" :query="{q: q, area: area}|filter(value => value != '')" />
 {% endblock %}

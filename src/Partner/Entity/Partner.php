@@ -3,6 +3,7 @@
 namespace App\Partner\Entity;
 
 use App\Partner\Repository\PartnerRepository;
+use App\Shared\Audit\Audited;
 use App\Shared\Validator\Nip;
 use App\Shared\Validator\NipValidator;
 use Doctrine\ORM\Mapping as ORM;
@@ -15,7 +16,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: PartnerRepository::class)]
 #[ORM\Table(name: 'partner_partner')]
 #[UniqueEntity('nip', message: 'Kontrahent z tym numerem NIP już istnieje.')]
-class Partner
+class Partner implements Audited
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -146,5 +147,37 @@ class Partner
     public function setActive(bool $active): void
     {
         $this->active = $active;
+    }
+
+    public static function auditCode(): string
+    {
+        return 'partner.partner';
+    }
+
+    public function auditLabel(): string
+    {
+        return \sprintf('kontrahenta %s', $this->name);
+    }
+
+    public static function auditFields(): array
+    {
+        return [
+            'name' => 'nazwa',
+            'nip' => 'NIP',
+            'customer' => 'odbiorca',
+            'supplier' => 'dostawca',
+            'email' => 'e-mail',
+            'phone' => 'telefon',
+            'address.street' => 'ulica',
+            'address.postalCode' => 'kod pocztowy',
+            'address.city' => 'miejscowość',
+            'address.countryCode' => 'kraj',
+            'active' => 'aktywny',
+        ];
+    }
+
+    public function auditRoute(): ?array
+    {
+        return ['partner_edit', ['id' => (int) $this->id]];
     }
 }

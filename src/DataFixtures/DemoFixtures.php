@@ -97,14 +97,17 @@ final class DemoFixtures extends Fixture
         mt_srand(2026);
 
         $this->users = $this->loadUsers($manager);
+        // The administrator sets the system up: warehouses, products, partners
+        $manager->flush();
+        $this->actAs(User::ROLE_ADMIN);
         [$main, $shop] = $this->loadWarehouses($manager);
         $products = $this->loadProducts($manager);
         [$customers, $suppliers] = $this->loadPartners($manager);
         $manager->flush();
 
         $goods = array_values(array_filter($products, static fn (Product $product): bool => ProductKind::Goods === $product->getKind()));
-        $today = $this->clock->now()->setTime(12, 0);
-        $firstOfThisMonth = $today->modify('first day of this month');
+        $today = $this->clock->now();
+        $firstOfThisMonth = $today->modify('first day of this month')->setTime(9, 0);
 
         // Five closed months and the current one, oldest first
         for ($monthsAgo = self::MONTHS - 1; $monthsAgo >= 0; --$monthsAgo) {
@@ -112,7 +115,7 @@ final class DemoFixtures extends Fixture
             $lastDay = 0 === $monthsAgo ? (int) $today->format('j') : (int) $monthStart->format('t');
             $isCurrent = 0 === $monthsAgo;
 
-            $this->travelTo($monthStart);
+            $this->travelTo(min($monthStart, $today));
             $this->receiveDelivery($manager, $main, $suppliers[mt_rand(0, \count($suppliers) - 1)], $goods, $monthStart, self::MONTHS - 1 === $monthsAgo);
 
             // Business grows a little month by month
@@ -124,7 +127,8 @@ final class DemoFixtures extends Fixture
             sort($days);
 
             foreach ($days as $i => $offset) {
-                $day = $monthStart->modify(\sprintf('+%d days', $offset));
+                // Never later than now: demo events must not sit above what the user does next
+                $day = min($monthStart->modify(\sprintf('+%d days', $offset)), $today);
                 $this->travelTo($day);
                 $order = $this->createOrder($manager, $customers[mt_rand(0, \count($customers) - 1)], $main, $products, $day);
 

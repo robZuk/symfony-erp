@@ -6,6 +6,7 @@ use App\Sales\Dto\OrderDraft;
 use App\Sales\Entity\SalesOrder;
 use App\Sales\Form\SalesOrderType;
 use App\Sales\Repository\SalesOrderRepository;
+use App\Shared\Audit\ActivityLog;
 use App\Shared\Tax\VatBreakdown;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -37,6 +38,7 @@ final class OrderEditor extends AbstractController
     public function __construct(
         private readonly SalesOrderRepository $orders,
         private readonly ClockInterface $clock,
+        private readonly ActivityLog $activity,
     ) {
     }
 
@@ -62,9 +64,16 @@ final class OrderEditor extends AbstractController
         }
 
         $now = $this->clock->now();
-        $order = $this->existingOrder() ?? new SalesOrder($draft->customerId, $draft->warehouseId, $draft->orderDate, $now);
+        $existing = $this->existingOrder();
+        $order = $existing ?? new SalesOrder($draft->customerId, $draft->warehouseId, $draft->orderDate, $now);
         $order->revise($draft->customerId, $draft->warehouseId, $draft->orderDate, $draft->note, $draft->completeLines());
         $this->orders->save($order);
+        $this->activity->record(
+            null === $existing ? 'sales.order.drafted' : 'sales.order.revised',
+            \sprintf(null === $existing ? 'Utworzono zamówienie %s.' : 'Zmieniono zamówienie %s.', $order->title()),
+            'sales_order_show',
+            ['id' => (int) $order->getId()],
+        );
 
         $this->addFlash('success', 'Zapisano zamówienie.');
 

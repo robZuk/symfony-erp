@@ -3,6 +3,7 @@
 namespace App\Inventory\Entity;
 
 use App\Inventory\Repository\WarehouseRepository;
+use App\Shared\Audit\Audited;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -10,7 +11,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: WarehouseRepository::class)]
 #[ORM\Table(name: 'inventory_warehouse')]
 #[UniqueEntity('code', message: 'Magazyn o tym kodzie już istnieje.')]
-class Warehouse
+class Warehouse implements Audited
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -69,5 +70,29 @@ class Warehouse
     public function label(): string
     {
         return \sprintf('%s — %s', $this->code, $this->name);
+    }
+
+    public static function auditCode(): string
+    {
+        return 'inventory.warehouse';
+    }
+
+    public function auditLabel(): string
+    {
+        return \sprintf('magazyn %s', $this->code);
+    }
+
+    public static function auditFields(): array
+    {
+        return [
+            'code' => 'kod',
+            'name' => 'nazwa',
+            'active' => 'czynny',
+        ];
+    }
+
+    public function auditRoute(): ?array
+    {
+        return ['inventory_warehouse_edit', ['id' => (int) $this->id]];
     }
 }

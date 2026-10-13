@@ -35,15 +35,23 @@ final class ActivityLog
     }
 
     /**
+     * The person to log under: the signed-in user, or the one named with onBehalfOf().
+     */
+    public function currentActor(mixed $user): ?Actor
+    {
+        return $user instanceof Actor ? $user : $this->onBehalfOf;
+    }
+
+    /**
      * @param string                    $action          a stable code such as "sales.order.confirmed"
      * @param string                    $summary         what happened, in words for the reader
      * @param string|null               $route           route of the page showing the subject, for a link in the log
      * @param array<string, int|string> $routeParameters
+     * @param Actor|null                $actor           who did it, when that is not the signed-in user (e.g. at sign-in itself)
      */
-    public function record(string $action, string $summary, ?string $route = null, array $routeParameters = []): void
+    public function record(string $action, string $summary, ?string $route = null, array $routeParameters = [], ?Actor $actor = null): void
     {
-        $user = $this->security->getUser();
-        $actor = $user instanceof Actor ? $user : $this->onBehalfOf;
+        $actor ??= $this->currentActor($this->security->getUser());
 
         $this->entityManager->persist(new ActivityEntry(
             $this->clock->now(),

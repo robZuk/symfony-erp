@@ -14,16 +14,33 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  */
 final class ActivityController extends AbstractController
 {
+    /** First part of the action code => what the area is called in the filter. */
+    private const array AREAS = [
+        'identity' => 'Konta i logowania',
+        'catalog' => 'Produkty',
+        'partner' => 'Kontrahenci',
+        'inventory' => 'Magazyn',
+        'sales' => 'Sprzedaż',
+        'invoicing' => 'Faktury i dane firmy',
+    ];
+
     #[Route('/admin/activity', name: 'app_activity', methods: ['GET'])]
     #[IsGranted('ROLE_ADMIN')]
     public function index(
         ActivityEntryRepository $entries,
         #[MapQueryParameter] string $q = '',
+        #[MapQueryParameter] string $area = '',
         #[MapQueryParameter(options: ['min_range' => 1])] int $page = 1,
     ): Response {
+        if ('' !== $area && !isset(self::AREAS[$area])) {
+            throw $this->createNotFoundException();
+        }
+
         return $this->render('dashboard/activity.html.twig', [
             'q' => $q,
-            'page' => $entries->search(mb_substr($q, 0, 100), $page),
+            'area' => $area,
+            'areas' => self::AREAS,
+            'page' => $entries->search(mb_substr($q, 0, 100), $area, $page),
         ]);
     }
 }
