@@ -59,6 +59,16 @@ class SalesOrder
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $shipmentNumber = null;
 
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $shippedAt = null;
+
+    /** The invoice issued for this order; ids from the Invoicing module. */
+    #[ORM\Column(nullable: true)]
+    private ?int $invoiceId = null;
+
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $invoiceNumber = null;
+
     public function __construct(int $customerId, int $warehouseId, \DateTimeImmutable $orderDate, \DateTimeImmutable $now)
     {
         $this->customerId = $customerId;
@@ -180,10 +190,34 @@ class SalesOrder
         $this->number = $number;
     }
 
-    public function recordShipment(int $documentId, string $number): void
+    /**
+     * @param array{int, string}|null $document id and number of the goods issue; null when nothing left the warehouse
+     */
+    public function recordShipment(\DateTimeImmutable $shippedAt, ?array $document): void
     {
-        $this->shipmentDocumentId = $documentId;
-        $this->shipmentNumber = $number;
+        $this->shippedAt = $shippedAt;
+        [$this->shipmentDocumentId, $this->shipmentNumber] = $document ?? [null, null];
+    }
+
+    public function getShippedAt(): ?\DateTimeImmutable
+    {
+        return $this->shippedAt;
+    }
+
+    public function recordInvoice(int $invoiceId, string $number): void
+    {
+        $this->invoiceId = $invoiceId;
+        $this->invoiceNumber = $number;
+    }
+
+    public function getInvoiceId(): ?int
+    {
+        return $this->invoiceId;
+    }
+
+    public function getInvoiceNumber(): ?string
+    {
+        return $this->invoiceNumber;
     }
 
     /**
@@ -209,6 +243,6 @@ class SalesOrder
             $lines[] = [$line->netValue(), $line->getVatRate()];
         }
 
-        return new VatBreakdown($lines);
+        return VatBreakdown::ofLines($lines);
     }
 }

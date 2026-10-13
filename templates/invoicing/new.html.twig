@@ -1,0 +1,30 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Nowa faktura – Mini-ERP{% endblock %}
+{% block heading %}Faktura do zamówienia {{ order.number }}{% endblock %}
+
+{% block page %}
+    <twig:Card class="max-w-2xl">
+        <twig:Card:Header>
+            <twig:Card:Description>
+                Pozycje, ceny i nabywca zostaną skopiowane z zamówienia. Wystawionej faktury nie da się edytować; pomyłkę naprawia faktura korygująca.
+            </twig:Card:Description>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                {{ form_errors(form) }}
+
+                <div class="grid gap-6 sm:grid-cols-3">
+                    {{ form_row(form.issueDate) }}
+                    {{ form_row(form.paymentDays) }}
+                    {{ form_row(form.paymentMethod) }}
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <twig:Button as="a" variant="outline" href="{{ path('sales_order_show', {id: order.id}) }}">Anuluj</twig:Button>
+                    <twig:Button type="submit">Wystaw fakturę</twig:Button>
+                </div>
+            {{ form_end(form) }}
+        </twig:Card:Content>
+    </twig:Card>
+{% endblock %}

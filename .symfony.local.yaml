@@ -2,3 +2,5 @@
 workers:
     tailwind:
         cmd: ['symfony', 'console', 'tailwind:build', '--watch']
+    messenger:
+        cmd: ['symfony', 'console', 'messenger:consume', 'async', '--time-limit=3600']

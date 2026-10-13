@@ -57,6 +57,9 @@ final class DoctrinePartnerDirectory implements PartnerDirectory
             $partner->getName(),
             $partner->getNip(),
             $partner->getAddress()->getCity(),
+            $partner->getAddress()->getStreet(),
+            $partner->getAddress()->getPostalCode(),
+            $partner->getAddress()->getCountryCode(),
         );
     }
 }

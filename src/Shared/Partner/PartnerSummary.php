@@ -12,6 +12,9 @@ final readonly class PartnerSummary
         public string $name,
         public ?string $nip,
         public string $city,
+        public string $street,
+        public string $postalCode,
+        public string $countryCode,
     ) {
     }
 }

@@ -22,5 +22,12 @@ framework:
             Symfony\Component\Notifier\Message\ChatMessage: async
             Symfony\Component\Notifier\Message\SmsMessage: async
 
-            # Route your messages to the transports
-            # 'App\Message\YourMessage': async
+            # Invoice PDFs are rendered by the background worker: symfony console messenger:consume async
+            App\Invoicing\Message\GenerateInvoicePdf: async
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                # Messages are kept in memory, so tests can check what was queued and run the handler themselves
+                async: 'in-memory://'

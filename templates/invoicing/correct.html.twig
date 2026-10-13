@@ -1,0 +1,64 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Korekta {{ invoice.number }} – Mini-ERP{% endblock %}
+{% block heading %}Korekta faktury {{ invoice.number }}{% endblock %}
+
+{% block page %}
+    {{ form_start(form, {attr: {class: 'grid gap-4', novalidate: 'novalidate'}}) }}
+        {{ form_errors(form) }}
+
+        <twig:Card>
+            <twig:Card:Header>
+                <twig:Card:Description>
+                    Wpisz ilości, jakie powinny być na fakturze. Pozycje bez zmian zostaną pominięte.
+                    Korekta zmienia tylko rozliczenie: zwrot towaru do magazynu przyjmij osobnym dokumentem PZ.
+                </twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th class="pb-2 text-start font-medium">Indeks</th>
+                            <th class="pb-2 text-start font-medium">Nazwa</th>
+                            <th class="pb-2 text-end font-medium">Cena netto</th>
+                            <th class="pb-2 text-end font-medium">Ilość dotychczas</th>
+                            <th class="w-36 pb-2 ps-4 text-start font-medium">Ilość po korekcie</th>
+                            <th class="pb-2 ps-2 text-start font-medium">J.m.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in invoice.lines %}
+                            {% set field = form.quantities[line.id] %}
+                            <tr class="align-top" data-test="correction-line">
+                                <td class="py-1 pt-2.5 font-mono">{{ line.sku }}</td>
+                                <td class="py-1 pt-2.5 font-medium">{{ line.name }}</td>
+                                <td class="py-1 pt-2.5 text-end tabular-nums">{{ line.unitNetPrice|money }}</td>
+                                <td class="py-1 pt-2.5 text-end tabular-nums">{{ invoice.currentQuantity(line)|quantity }}</td>
+                                <td class="py-1 ps-4">
+                                    {{ form_widget(field, {attr: {'aria-label': 'Ilość po korekcie: ' ~ line.sku}}) }}
+                                    {{ form_errors(field) }}
+                                </td>
+                                <td class="py-1 ps-2 pt-2.5">{{ line.unit }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% do form.quantities.setRendered %}
+            </twig:Card:Content>
+        </twig:Card>
+
+        <twig:Card class="max-w-2xl">
+            <twig:Card:Content class="grid gap-6">
+                <div class="grid gap-6 sm:grid-cols-2">
+                    {{ form_row(form.issueDate) }}
+                </div>
+                {{ form_row(form.reason) }}
+            </twig:Card:Content>
+        </twig:Card>
+
+        <div class="flex justify-end gap-2">
+            <twig:Button as="a" variant="outline" href="{{ path('invoicing_invoice_show', {id: invoice.id}) }}">Anuluj</twig:Button>
+            <twig:Button type="submit">Wystaw korektę</twig:Button>
+        </div>
+    {{ form_end(form) }}
+{% endblock %}

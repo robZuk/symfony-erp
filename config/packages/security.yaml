@@ -37,7 +37,7 @@ security:
         ROLE_ADMIN: [ROLE_WAREHOUSE, ROLE_SALES, ROLE_ACCOUNTING]
         ROLE_WAREHOUSE: [ROLE_CATALOG_EDIT, ROLE_INVENTORY_EDIT]
         ROLE_SALES: [ROLE_CATALOG_EDIT, ROLE_PARTNER_EDIT, ROLE_SALES_EDIT]
-        ROLE_ACCOUNTING: [ROLE_PARTNER_EDIT]
+        ROLE_ACCOUNTING: [ROLE_PARTNER_EDIT, ROLE_INVOICING_EDIT]
 
     # Everything except the login page requires a signed-in user.
     # Note: Only the *first* matching rule is applied

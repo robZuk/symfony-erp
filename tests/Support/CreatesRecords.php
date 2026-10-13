@@ -15,6 +15,7 @@ use App\Partner\Entity\Partner;
 use App\Partner\Repository\PartnerRepository;
 use App\Sales\Entity\SalesOrder;
 use App\Sales\Repository\SalesOrderRepository;
+use App\Sales\Service\OrderLifecycle;
 use App\Shared\Tax\VatRate;
 
 /**
@@ -83,10 +84,11 @@ trait CreatesRecords
         return $document;
     }
 
-    private function createCustomer(string $name = 'Klient'): Partner
+    private function createCustomer(string $name = 'Klient', ?string $nip = null): Partner
     {
         $partner = new Partner();
         $partner->setName($name);
+        $partner->setNip($nip);
         $partner->getAddress()->setStreet('Prosta 1');
         $partner->getAddress()->setPostalCode('00-001');
         $partner->getAddress()->setCity('Warszawa');
@@ -114,6 +116,32 @@ trait CreatesRecords
             $lines,
         ));
         self::getContainer()->get(SalesOrderRepository::class)->save($order);
+
+        return $order;
+    }
+
+    /**
+     * An order that has been confirmed and shipped, so it is ready to be invoiced.
+     * Stock for it is received first.
+     *
+     * @param list<array{Product, int}> $lines
+     */
+    private function createShippedOrder(Partner $customer, Warehouse $warehouse, array $lines): SalesOrder
+    {
+        $stock = [];
+        foreach ($lines as [$product, $quantity]) {
+            if (ProductKind::Goods === $product->getKind()) {
+                $stock[(int) $product->getId()] = ($stock[(int) $product->getId()] ?? 0) + $quantity;
+            }
+        }
+        if ([] !== $stock) {
+            $this->receive($warehouse, $stock);
+        }
+
+        $order = $this->createOrder($customer, $warehouse, $lines);
+        $lifecycle = self::getContainer()->get(OrderLifecycle::class);
+        $lifecycle->confirm($order);
+        $lifecycle->ship($order);
 
         return $order;
     }

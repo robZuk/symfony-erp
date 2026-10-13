@@ -19,7 +19,7 @@ Projekt w budowie — moduły powstają etapami.
 
 Każdy moduł leży w `src/<Moduł>` i może zależeć tylko od `Shared` (wyjątkiem jest `Dashboard`). Granic pilnuje Deptrac (`deptrac.yaml`).
 
-Moduły nie sięgają do swoich encji nawzajem. Magazyn przechowuje tylko identyfikatory produktów i kontrahentów, a o resztę pyta przez interfejsy z `Shared` (`ProductDirectory`, `PartnerDirectory`, `WarehouseDirectory`), które implementują moduły-właściciele.
+Moduły nie sięgają do swoich encji nawzajem. Magazyn przechowuje tylko identyfikatory produktów i kontrahentów, a o resztę pyta przez interfejsy z `Shared` (`ProductDirectory`, `PartnerDirectory`, `WarehouseDirectory`, `StockReservations`, `BillableOrders`), które implementują moduły-właściciele.
 
 ## Magazyn
 
@@ -40,6 +40,15 @@ Blokady i numeracja korzystają ze składni PostgreSQL (`INSERT … ON CONFLICT`
 - Formularz zamówienia to Live Component (`App\Sales\Twig\OrderEditor`): pozycje, ceny z kartoteki i sumy odświeżają się po stronie serwera, bez własnego JavaScriptu.
 - Ceny i stawki VAT są kopiowane na pozycję, więc późniejsze zmiany w kartotece nie zmieniają zamówienia. VAT jest liczony od sumy netto w każdej stawce.
 
+## Faktury
+
+- Fakturę wystawia się do wydanego zamówienia, jedną na zamówienie. Wystawienie to jedna transakcja: numer (`FV/2026/10/0001`), zapis faktury i przejście zamówienia w status „zafakturowane”.
+- Faktura jest migawką: dane sprzedawcy, nabywcy i pozycji są na nią kopiowane, a sumy zapisywane. Późniejsze zmiany w kartotekach jej nie ruszają.
+- Wystawionej faktury nie da się edytować. Pomyłkę naprawia faktura korygująca (`FK/…`), która zmniejsza ilości i pokazuje „było / jest / różnica”. VAT korekty to różnica między VAT-em dokumentu przed i po, dzięki czemu faktura i jej korekty zawsze sumują się co do grosza.
+- PDF generuje w tle worker Messengera (`messenger:consume async`, uruchamiany przez `make serve`). Wiadomość trafia do kolejki w tej samej transakcji bazy co faktura. Strona faktury sama odświeża status, aż plik będzie gotowy.
+- Dane sprzedawcy są w `config/services.yaml` (`app.seller`).
+- Fakturuje księgowość; przeglądać może każdy zalogowany.
+
 ## Uruchomienie
 
 Wymagania: PHP 8.5, Composer, [Symfony CLI](https://symfony.com/download), Docker.
@@ -48,7 +57,7 @@ Wymagania: PHP 8.5, Composer, [Symfony CLI](https://symfony.com/download), Docke
 composer install
 make up      # Postgres i Mailpit
 make db      # baza i migracje
-make serve   # serwer deweloperski, w tle przebudowuje CSS
+make serve   # serwer deweloperski; w tle przebudowuje CSS i obsługuje kolejkę (PDF faktur)
 symfony console app:user:create admin@example.com "Jan Kowalski" --role=ROLE_ADMIN
 ```
 

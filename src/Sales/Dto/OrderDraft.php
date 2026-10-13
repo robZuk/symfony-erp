@@ -67,7 +67,7 @@ final class OrderDraft
             }
         }
 
-        return new VatBreakdown($lines);
+        return VatBreakdown::ofLines($lines);
     }
 
     /**

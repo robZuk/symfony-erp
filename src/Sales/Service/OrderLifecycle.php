@@ -10,6 +10,7 @@ use App\Shared\Numbering\DocumentNumberGenerator;
 use App\Shared\Persistence\Transactional;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\Workflow\WorkflowInterface;
 
@@ -35,6 +36,7 @@ final class OrderLifecycle
         private readonly StockReservations $stock,
         private readonly ProductDirectory $products,
         private readonly DocumentNumberGenerator $numbers,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -66,6 +68,7 @@ final class OrderLifecycle
             $this->lockAndRequire($order, 'ship', 'Wydać można tylko potwierdzone zamówienie.');
 
             $quantities = $this->stockQuantities($order);
+            $document = null;
             // An order for services alone has nothing to take out of the warehouse
             if ([] !== $quantities) {
                 $shipment = $this->stock->ship(
@@ -74,9 +77,10 @@ final class OrderLifecycle
                     $quantities,
                     \sprintf('Zamówienie %s', $order->getNumber()),
                 );
-                $order->recordShipment($shipment->documentId, $shipment->number);
+                $document = [$shipment->documentId, $shipment->number];
             }
 
+            $order->recordShipment($this->clock->now(), $document);
             $this->workflow->apply($order, 'ship');
         });
     }

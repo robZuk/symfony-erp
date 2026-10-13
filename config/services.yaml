@@ -7,6 +7,18 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # The company that issues the invoices. Demo data: replace with your own.
+    app.seller:
+        name: 'Mini-ERP Demo sp. z o.o.'
+        nip: '1234563218'
+        street: 'Przykładowa 1'
+        postal_code: '00-001'
+        city: 'Warszawa'
+        country_code: 'PL'
+        bank_account: 'PL00 0000 0000 0000 0000 0000 0000'
+
+    # Generated invoice PDFs, kept apart per environment so tests never touch real files
+    app.invoice_dir: '%kernel.project_dir%/var/invoices/%kernel.environment%'
 
 services:
     # default configuration for services in *this* file

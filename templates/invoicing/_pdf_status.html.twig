@@ -1,0 +1,25 @@
+{# Template of the Invoicing:PdfStatus Live Component (App\Invoicing\Twig\PdfStatus). #}
+<div {{ attributes.defaults({class: 'flex items-center gap-2'}) }}
+    {# Keep asking the server only while the worker has not finished #}
+    {% if not this.ready and not this.failed %}data-poll="delay(1500)|$render"{% endif %}
+>
+    {% if this.ready %}
+        <twig:Button as="a" variant="outline" href="{{ path('invoicing_invoice_pdf', {id: invoice.id}) }}" target="_blank" data-test="pdf-download">
+            <twig:ux:icon name="lucide:file-down" data-icon="inline-start" aria-hidden="true" />
+            Pobierz PDF
+        </twig:Button>
+    {% elseif this.failed %}
+        <span class="text-sm text-destructive" data-test="pdf-failed">Nie udało się wygenerować PDF.</span>
+        {% if is_granted('ROLE_INVOICING_EDIT') %}
+            <form method="post" action="{{ path('invoicing_invoice_pdf_retry', {id: invoice.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('invoicing_pdf_retry') }}">
+                <twig:Button type="submit" variant="outline">Spróbuj ponownie</twig:Button>
+            </form>
+        {% endif %}
+    {% else %}
+        <span class="flex items-center gap-2 text-sm text-muted-foreground" data-test="pdf-pending">
+            <twig:ux:icon name="lucide:loader-circle" class="size-4 animate-spin" aria-hidden="true" />
+            PDF w przygotowaniu…
+        </span>
+    {% endif %}
+</div>

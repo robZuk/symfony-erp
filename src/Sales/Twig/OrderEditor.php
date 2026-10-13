@@ -47,7 +47,7 @@ final class OrderEditor extends AbstractController
     {
         $draft = $this->getForm()->getData();
 
-        return $draft instanceof OrderDraft ? $draft->totals() : new VatBreakdown([]);
+        return $draft instanceof OrderDraft ? $draft->totals() : VatBreakdown::ofLines([]);
     }
 
     #[LiveAction]

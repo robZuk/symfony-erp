@@ -1,0 +1,172 @@
+{# The printed invoice. Rendered to PDF by dompdf, so it uses plain CSS 2.1 and tables, not Tailwind. #}
+{% set totals = invoice.totals %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ invoice.number }}</title>
+    <style>
+        @page { margin: 18mm 15mm; }
+        body { font-family: 'DejaVu Sans', sans-serif; font-size: 9pt; color: #111; }
+        h1 { font-size: 16pt; margin: 0 0 2mm; }
+        table { width: 100%; border-collapse: collapse; }
+        .muted { color: #666; }
+        .right { text-align: right; }
+        .header td { vertical-align: top; }
+        .parties { margin-top: 8mm; }
+        .parties td { width: 50%; vertical-align: top; padding-right: 6mm; }
+        .label { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #666; margin-bottom: 1mm; }
+        .name { font-weight: bold; }
+        .lines { margin-top: 8mm; }
+        .lines th { font-size: 7.5pt; text-align: left; border-bottom: 0.6pt solid #111; padding: 1.5mm 1mm; }
+        .lines td { border-bottom: 0.3pt solid #ccc; padding: 1.5mm 1mm; vertical-align: top; }
+        .lines th.right, .lines td.right { text-align: right; }
+        .summary { margin-top: 6mm; }
+        .summary .vat { width: 55%; margin-left: 45%; }
+        .summary .vat th { font-size: 7.5pt; text-align: right; border-bottom: 0.6pt solid #111; padding: 1mm; }
+        .summary .vat td { text-align: right; padding: 1mm; }
+        .summary .vat .total td { font-weight: bold; border-top: 0.6pt solid #111; }
+        .due { margin-top: 6mm; font-size: 12pt; font-weight: bold; text-align: right; }
+        .note { margin-top: 6mm; padding: 2mm 3mm; background: #f3f3f3; }
+        .footer { margin-top: 18mm; }
+        .footer td { width: 50%; text-align: center; font-size: 7.5pt; color: #666; }
+        .signature { border-top: 0.3pt solid #999; margin: 0 12mm; padding-top: 1mm; }
+    </style>
+</head>
+<body>
+    <table class="header">
+        <tr>
+            <td>
+                <h1>{{ invoice.type.label }}</h1>
+                <div>nr <strong>{{ invoice.number }}</strong></div>
+                {% if invoice.correction %}
+                    <div class="muted">do faktury {{ invoice.corrected.number }} z {{ invoice.corrected.issueDate|date('d.m.Y') }}</div>
+                {% endif %}
+            </td>
+            <td class="right">
+                <div><span class="muted">Data wystawienia:</span> {{ invoice.issueDate|date('d.m.Y') }}</div>
+                <div><span class="muted">Data sprzedaży:</span> {{ invoice.saleDate|date('d.m.Y') }}</div>
+                <div><span class="muted">Miejsce wystawienia:</span> {{ invoice.seller.city }}</div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="parties">
+        <tr>
+            {% for label, party in {Sprzedawca: invoice.seller, Nabywca: invoice.buyer} %}
+                <td>
+                    <div class="label">{{ label }}</div>
+                    <div class="name">{{ party.name }}</div>
+                    <div>{{ party.street }}</div>
+                    <div>{{ party.postalCode }} {{ party.city }}</div>
+                    {% if party.nip %}<div>NIP: {{ party.nip }}</div>{% endif %}
+                </td>
+            {% endfor %}
+        </tr>
+    </table>
+
+    {% if invoice.correction %}
+        <div class="note"><strong>Przyczyna korekty:</strong> {{ invoice.correctionReason }}</div>
+    {% endif %}
+
+    <table class="lines">
+        <thead>
+            <tr>
+                <th>Lp.</th>
+                <th>Nazwa towaru lub usługi</th>
+                {% if invoice.correction %}
+                    <th class="right">Było</th>
+                    <th class="right">Jest</th>
+                    <th class="right">Różnica</th>
+                {% else %}
+                    <th class="right">Ilość</th>
+                {% endif %}
+                <th>J.m.</th>
+                <th class="right">Cena netto</th>
+                <th class="right">VAT</th>
+                <th class="right">Wartość netto</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in invoice.lines %}
+                <tr>
+                    <td>{{ line.position }}</td>
+                    <td>{{ line.name }}<br><span class="muted">{{ line.sku }}</span></td>
+                    {% if invoice.correction %}
+                        <td class="right">{{ line.quantityBefore|quantity }}</td>
+                        <td class="right">{{ line.quantityAfter|quantity }}</td>
+                        <td class="right">{{ line.quantity|quantity }}</td>
+                    {% else %}
+                        <td class="right">{{ line.quantity|quantity }}</td>
+                    {% endif %}
+                    <td>{{ line.unit }}</td>
+                    <td class="right">{{ line.unitNetPrice|money }}</td>
+                    <td class="right">{{ line.vatRate.label }}</td>
+                    <td class="right">{{ line.netValue|money }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="summary">
+        <table class="vat">
+            <thead>
+                <tr>
+                    <th>Stawka VAT</th>
+                    <th>Netto</th>
+                    <th>VAT</th>
+                    <th>Brutto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in totals.rows %}
+                    <tr>
+                        <td>{{ row.rate.label }}</td>
+                        <td>{{ row.net|money }}</td>
+                        <td>{{ row.vat|money }}</td>
+                        <td>{{ row.gross|money }}</td>
+                    </tr>
+                {% endfor %}
+                <tr class="total">
+                    <td>Razem</td>
+                    <td>{{ invoice.netTotal|money }}</td>
+                    <td>{{ invoice.vatTotal|money }}</td>
+                    <td>{{ invoice.grossTotal|money }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="due">
+        {% if not invoice.correction %}
+            Do zapłaty: {{ invoice.grossTotal|money }}
+        {% elseif invoice.grossTotal.minor < 0 %}
+            Do zwrotu: {{ (-invoice.grossTotal.minor)|money }}
+        {% else %}
+            Do dopłaty: {{ invoice.grossTotal|money }}
+        {% endif %}
+    </div>
+
+    <table style="margin-top: 4mm;">
+        <tr>
+            <td>
+                <span class="muted">Forma płatności:</span> {{ invoice.paymentMethod.label }}<br>
+                <span class="muted">Termin płatności:</span> {{ invoice.dueDate|date('d.m.Y') }}
+                {% if invoice.paymentMethod.value == 'transfer' and invoice.sellerBankAccount %}
+                    <br><span class="muted">Rachunek:</span> {{ invoice.sellerBankAccount }}
+                {% endif %}
+            </td>
+            <td class="right muted">
+                {% if invoice.orderNumber %}Zamówienie: {{ invoice.orderNumber }}{% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <table class="footer">
+        <tr>
+            <td><div class="signature">Osoba upoważniona do wystawienia</div></td>
+            <td><div class="signature">Osoba upoważniona do odbioru</div></td>
+        </tr>
+    </table>
+</body>
+</html>

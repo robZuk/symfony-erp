@@ -19,14 +19,16 @@
                 {% elseif status == 'confirmed' %}
                     Towar jest zarezerwowany i czeka na wydanie z magazynu.
                 {% elseif status == 'shipped' %}
-                    Towar został wydany.
+                    Towar został wydany. Zamówienie czeka na fakturę.
+                {% elseif status == 'invoiced' %}
+                    Zamówienie zostało zafakturowane.
                 {% elseif status == 'cancelled' %}
                     Zamówienie anulowane.
                 {% endif %}
             </twig:Card:Description>
         </twig:Card:Header>
         <twig:Card:Content>
-            <dl class="grid gap-4 text-sm sm:grid-cols-4">
+            <dl class="grid gap-4 text-sm sm:grid-cols-5">
                 <div>
                     <dt class="text-muted-foreground">Odbiorca</dt>
                     <dd class="font-medium">{{ customer.name ?? '—' }}</dd>
@@ -47,8 +49,16 @@
                         </dd>
                     </div>
                 {% endif %}
+                {% if order.invoiceNumber %}
+                    <div>
+                        <dt class="text-muted-foreground">Faktura</dt>
+                        <dd class="font-medium">
+                            <a href="{{ path('invoicing_invoice_show', {id: order.invoiceId}) }}" class="underline underline-offset-4" data-test="invoice-link">{{ order.invoiceNumber }}</a>
+                        </dd>
+                    </div>
+                {% endif %}
                 {% if order.note %}
-                    <div class="sm:col-span-4">
+                    <div class="sm:col-span-5">
                         <dt class="text-muted-foreground">Uwagi</dt>
                         <dd class="whitespace-pre-line">{{ order.note }}</dd>
                     </div>
@@ -133,6 +143,9 @@
                     <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_id) }}">
                     <twig:Button type="submit">Potwierdź</twig:Button>
                 </form>
+            {% endif %}
+            {% if is_granted('ROLE_INVOICING_EDIT') and workflow_can(order, 'invoice') %}
+                <twig:Button as="a" href="{{ path('invoicing_invoice_new', {order: order.id}) }}">Wystaw fakturę</twig:Button>
             {% endif %}
             {% if is_granted('ROLE_INVENTORY_EDIT') and workflow_can(order, 'ship') %}
                 <form method="post" action="{{ path('sales_order_ship', {id: order.id}) }}">

@@ -1,0 +1,150 @@
+{% extends 'layout.html.twig' %}
+
+{% set totals = invoice.totals %}
+
+{% block title %}{{ invoice.number }} – Mini-ERP{% endblock %}
+{% block heading %}{{ invoice.number }}{% endblock %}
+
+{% block page %}
+    <twig:Card>
+        <twig:Card:Header>
+            <twig:Card:Title data-test="invoice-type">{{ invoice.type.label }}</twig:Card:Title>
+            <twig:Card:Description>
+                {% if invoice.correction %}
+                    Koryguje fakturę
+                    <a href="{{ path('invoicing_invoice_show', {id: invoice.corrected.id}) }}" class="underline underline-offset-4" data-test="corrected-link">{{ invoice.corrected.number }}</a>.
+                    Przyczyna: {{ invoice.correctionReason }}
+                {% else %}
+                    Do zamówienia
+                    <a href="{{ path('sales_order_show', {id: invoice.orderId}) }}" class="underline underline-offset-4">{{ invoice.orderNumber }}</a>.
+                {% endif %}
+            </twig:Card:Description>
+            <twig:Card:Action>
+                <twig:Invoicing:PdfStatus :invoice="invoice" />
+            </twig:Card:Action>
+        </twig:Card:Header>
+        <twig:Card:Content>
+            <div class="grid gap-6 text-sm sm:grid-cols-3">
+                {% for role, party in {seller: invoice.seller, buyer: invoice.buyer} %}
+                    <div data-test="party-{{ role }}">
+                        <div class="text-muted-foreground">{{ role == 'seller' ? 'Sprzedawca' : 'Nabywca' }}</div>
+                        <div class="font-medium">{{ party.name }}</div>
+                        <div>{{ party.street }}</div>
+                        <div>{{ party.postalCode }} {{ party.city }}</div>
+                        {% if party.nip %}<div>NIP: {{ party.nip }}</div>{% endif %}
+                    </div>
+                {% endfor %}
+                <dl class="grid grid-cols-[auto_1fr] content-start gap-x-4 gap-y-1">
+                    <dt class="text-muted-foreground">Data wystawienia</dt>
+                    <dd>{{ invoice.issueDate|date('d.m.Y') }}</dd>
+                    <dt class="text-muted-foreground">Data sprzedaży</dt>
+                    <dd>{{ invoice.saleDate|date('d.m.Y') }}</dd>
+                    <dt class="text-muted-foreground">Termin płatności</dt>
+                    <dd>{{ invoice.dueDate|date('d.m.Y') }}</dd>
+                    <dt class="text-muted-foreground">Forma płatności</dt>
+                    <dd>{{ invoice.paymentMethod.label }}</dd>
+                </dl>
+            </div>
+        </twig:Card:Content>
+    </twig:Card>
+
+    <twig:Card class="py-0">
+        <twig:Table>
+            <twig:Table:Header>
+                <twig:Table:Row>
+                    <twig:Table:Head class="w-12">Lp.</twig:Table:Head>
+                    <twig:Table:Head>Indeks</twig:Table:Head>
+                    <twig:Table:Head>Nazwa</twig:Table:Head>
+                    {% if invoice.correction %}
+                        <twig:Table:Head class="text-end">Było</twig:Table:Head>
+                        <twig:Table:Head class="text-end">Jest</twig:Table:Head>
+                        <twig:Table:Head class="text-end">Różnica</twig:Table:Head>
+                    {% else %}
+                        <twig:Table:Head class="text-end">Ilość</twig:Table:Head>
+                    {% endif %}
+                    <twig:Table:Head>J.m.</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Cena netto</twig:Table:Head>
+                    <twig:Table:Head class="text-end">VAT</twig:Table:Head>
+                    <twig:Table:Head class="text-end">Wartość netto</twig:Table:Head>
+                </twig:Table:Row>
+            </twig:Table:Header>
+            <twig:Table:Body>
+                {% for line in invoice.lines %}
+                    <twig:Table:Row data-test="line-row">
+                        <twig:Table:Cell>{{ line.position }}</twig:Table:Cell>
+                        <twig:Table:Cell class="font-mono">{{ line.sku }}</twig:Table:Cell>
+                        <twig:Table:Cell class="font-medium">{{ line.name }}</twig:Table:Cell>
+                        {% if invoice.correction %}
+                            <twig:Table:Cell class="text-end tabular-nums">{{ line.quantityBefore|quantity }}</twig:Table:Cell>
+                            <twig:Table:Cell class="text-end tabular-nums">{{ line.quantityAfter|quantity }}</twig:Table:Cell>
+                            <twig:Table:Cell class="text-end tabular-nums">{{ line.quantity|quantity }}</twig:Table:Cell>
+                        {% else %}
+                            <twig:Table:Cell class="text-end tabular-nums">{{ line.quantity|quantity }}</twig:Table:Cell>
+                        {% endif %}
+                        <twig:Table:Cell>{{ line.unit }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ line.unitNetPrice|money }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end">{{ line.vatRate.label }}</twig:Table:Cell>
+                        <twig:Table:Cell class="text-end tabular-nums">{{ line.netValue|money }}</twig:Table:Cell>
+                    </twig:Table:Row>
+                {% endfor %}
+            </twig:Table:Body>
+        </twig:Table>
+    </twig:Card>
+
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <table class="text-sm">
+            <thead>
+                <tr class="text-muted-foreground">
+                    <th class="pe-6 text-start font-normal">Stawka</th>
+                    <th class="pe-6 text-end font-normal">Netto</th>
+                    <th class="pe-6 text-end font-normal">VAT</th>
+                    <th class="text-end font-normal">Brutto</th>
+                </tr>
+            </thead>
+            <tbody class="tabular-nums">
+                {% for row in totals.rows %}
+                    <tr data-test="vat-row">
+                        <td class="pe-6">{{ row.rate.label }}</td>
+                        <td class="pe-6 text-end">{{ row.net|money }}</td>
+                        <td class="pe-6 text-end">{{ row.vat|money }}</td>
+                        <td class="text-end">{{ row.gross|money }}</td>
+                    </tr>
+                {% endfor %}
+                <tr class="font-semibold">
+                    <td class="pe-6 pt-1">{{ invoice.correction ? 'Razem korekta' : 'Do zapłaty' }}</td>
+                    <td class="pe-6 pt-1 text-end" data-test="invoice-net">{{ invoice.netTotal|money }}</td>
+                    <td class="pe-6 pt-1 text-end" data-test="invoice-vat">{{ invoice.vatTotal|money }}</td>
+                    <td class="pt-1 text-end" data-test="invoice-gross">{{ invoice.grossTotal|money }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% if not invoice.correction and is_granted('ROLE_INVOICING_EDIT') %}
+            <twig:Button as="a" variant="outline" href="{{ path('invoicing_invoice_correct', {id: invoice.id}) }}">Wystaw korektę</twig:Button>
+        {% endif %}
+    </div>
+
+    {% if invoice.corrections is not empty %}
+        <twig:Card>
+            <twig:Card:Header>
+                <twig:Card:Title>Korekty</twig:Card:Title>
+                <twig:Card:Description>
+                    Po korektach do zapłaty: <span class="font-medium text-foreground" data-test="after-corrections">{{ invoice.grossAfterCorrections|money }}</span>
+                </twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content>
+                <ul class="grid gap-2 text-sm">
+                    {% for correction in invoice.corrections %}
+                        <li class="flex flex-wrap items-baseline justify-between gap-2" data-test="correction-row">
+                            <span>
+                                <a href="{{ path('invoicing_invoice_show', {id: correction.id}) }}" class="font-medium underline underline-offset-4">{{ correction.number }}</a>
+                                z {{ correction.issueDate|date('d.m.Y') }} — {{ correction.correctionReason }}
+                            </span>
+                            <span class="tabular-nums">{{ correction.grossTotal|money }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </twig:Card:Content>
+        </twig:Card>
+    {% endif %}
+{% endblock %}
