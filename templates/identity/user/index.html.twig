@@ -61,7 +61,7 @@
                             </twig:Table:Cell>
                             <twig:Table:Cell>
                                 <div class="flex justify-end gap-1">
-                                    <twig:Button as="a" variant="ghost" size="sm" href="{{ path('identity_user_edit', {id: user.id}) }}">Edytuj</twig:Button>
+                                    <twig:Button as="a" variant="ghost" size="sm" href="{{ path('identity_user_edit', {id: user.id}) }}" title="Imię i nazwisko, role, nowe hasło">Role i dane</twig:Button>
                                     {# Not while already working as someone else, and never as a blocked account.
                                         The link goes to the home page: this list is closed to everyone but administrators. #}
                                     {% if user != app.user and user.active and not is_granted('IS_IMPERSONATOR') %}
