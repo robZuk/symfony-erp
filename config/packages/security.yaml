@@ -19,6 +19,10 @@ security:
             lazy: true
             provider: app_user_provider
             user_checker: App\Identity\Security\UserChecker
+            # An administrator can work as another user, to see what they see: ?_switch_user=<e-mail>,
+            # and ?_switch_user=_exit to come back. The activity log keeps naming the administrator.
+            switch_user:
+                role: ROLE_ADMIN
             # After 5 failed sign-ins to one account from one address, further attempts are refused for 15 minutes.
             # One address is also limited across all accounts (5 times as many attempts), against guessing many logins.
             login_throttling:

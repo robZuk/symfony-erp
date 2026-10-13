@@ -67,7 +67,8 @@
                 </twig:Sidebar:Menu>
             </twig:Sidebar:Header>
 
-            <twig:Sidebar:Content>
+            {# Scrolls on its own when the menu is taller than the window, so it never slides under the account button #}
+            <twig:Sidebar:Content class="overflow-y-auto">
                 {# A group with a "role" is shown only to users who have it #}
                 {% for group in navigation|filter(group => group.role is not defined or is_granted(group.role)) %}
                     <twig:Sidebar:Group>
@@ -160,6 +161,17 @@
                     <twig:ux:icon name="lucide:moon" class="hidden dark:block" aria-hidden="true" />
                 </twig:Button>
             </header>
+
+            {% if is_granted('IS_IMPERSONATOR') %}
+                {# Shown on every page while an administrator is working as another user #}
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b bg-muted px-4 py-2 text-sm" role="status" data-test="impersonation-banner">
+                    <span class="flex items-center gap-2">
+                        <twig:ux:icon name="lucide:user-round-cog" class="size-4" aria-hidden="true" />
+                        Pracujesz jako <strong>{{ app.user.fullName }}</strong>. Widzisz i możesz zrobić to, co ta osoba; dziennik zapisze Ciebie.
+                    </span>
+                    <twig:Button as="a" variant="outline" size="sm" href="{{ impersonation_exit_path(path('identity_user_index')) }}">Wróć do swojego konta</twig:Button>
+                </div>
+            {% endif %}
 
             <div class="flex flex-1 flex-col gap-4 p-4">
                 {% for type, messages in app.flashes %}

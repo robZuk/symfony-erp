@@ -62,6 +62,11 @@
                             <twig:Table:Cell>
                                 <div class="flex justify-end gap-1">
                                     <twig:Button as="a" variant="ghost" size="sm" href="{{ path('identity_user_edit', {id: user.id}) }}">Edytuj</twig:Button>
+                                    {# Not while already working as someone else, and never as a blocked account.
+                                        The link goes to the home page: this list is closed to everyone but administrators. #}
+                                    {% if user != app.user and user.active and not is_granted('IS_IMPERSONATOR') %}
+                                        <twig:Button as="a" variant="ghost" size="sm" href="{{ path('app_dashboard', {_switch_user: user.email}) }}" title="Zobacz system oczami tego użytkownika">Pracuj jako</twig:Button>
+                                    {% endif %}
                                     {% if user != app.user %}
                                         <form method="post" action="{{ path('identity_user_toggle', {id: user.id}) }}">
                                             <input type="hidden" name="_token" value="{{ csrf_token('identity_user_toggle') }}">

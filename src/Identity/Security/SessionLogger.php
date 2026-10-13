@@ -6,12 +6,15 @@ use App\Shared\Audit\ActivityEntryRepository;
 use App\Shared\Audit\ActivityLog;
 use App\Shared\Audit\Actor;
 use Psr\Clock\ClockInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
 use Symfony\Component\Security\Core\Exception\TooManyLoginAttemptsAuthenticationException;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Event\LoginFailureEvent;
 use Symfony\Component\Security\Http\Event\LoginSuccessEvent;
 use Symfony\Component\Security\Http\Event\LogoutEvent;
+use Symfony\Component\Security\Http\Event\SwitchUserEvent;
 
 /**
  * Puts sign-ins, failed attempts, lock-outs and sign-outs into the activity log.
@@ -22,6 +25,7 @@ final class SessionLogger
         private readonly ActivityLog $activity,
         private readonly ActivityEntryRepository $entries,
         private readonly ClockInterface $clock,
+        private readonly Security $security,
     ) {
     }
 
@@ -59,6 +63,39 @@ final class SessionLogger
         $summary = \sprintf('Zablokowano logowanie na konto „%s” po zbyt wielu nieudanych próbach.', $identifier);
         if (!$this->entries->hasSince('identity.session.sign_in_locked', $summary, $this->clock->now()->modify('-15 minutes'))) {
             $this->activity->record('identity.session.sign_in_locked', $summary);
+        }
+    }
+
+    /**
+     * An administrator starting or ending work as another user. Fired by the firewall's switch_user feature.
+     */
+    #[AsEventListener]
+    public function onSwitchUser(SwitchUserEvent $event): void
+    {
+        $token = $event->getToken();
+        $target = $event->getTargetUser();
+
+        if ($token instanceof SwitchUserToken) {
+            $administrator = $token->getOriginalToken()->getUser();
+            if ($administrator instanceof Actor && $target instanceof Actor) {
+                $this->activity->record(
+                    'identity.session.impersonation_started',
+                    \sprintf('Rozpoczęto pracę jako %s.', $target->actorName()),
+                    actor: $administrator,
+                );
+            }
+
+            return;
+        }
+
+        // Coming back: the target is the administrator again, and the user they were working as is on the way out
+        $impersonated = $this->security->getUser();
+        if ($target instanceof Actor && $impersonated instanceof Actor) {
+            $this->activity->record(
+                'identity.session.impersonation_ended',
+                \sprintf('Zakończono pracę jako %s.', $impersonated->actorName()),
+                actor: $target,
+            );
         }
     }
 

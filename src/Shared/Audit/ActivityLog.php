@@ -5,6 +5,7 @@ namespace App\Shared\Audit;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
 
 /**
  * Writes the activity log. Modules call record() right where something worth remembering happens.
@@ -36,10 +37,21 @@ final class ActivityLog
 
     /**
      * The person to log under: the signed-in user, or the one named with onBehalfOf().
+     *
+     * While an administrator is working as somebody else, the administrator is the one held to account:
+     * the entry carries their id and reads "Adam Administrator (jako Hanna Handlowiec)".
      */
-    public function currentActor(mixed $user): ?Actor
+    public function currentActor(): ?Actor
     {
-        return $user instanceof Actor ? $user : $this->onBehalfOf;
+        $token = $this->security->getToken();
+        $user = $token?->getUser();
+        if (!$user instanceof Actor) {
+            return $this->onBehalfOf;
+        }
+
+        $impersonator = $token instanceof SwitchUserToken ? $token->getOriginalToken()->getUser() : null;
+
+        return $impersonator instanceof Actor ? new ImpersonatingActor($impersonator, $user) : $user;
     }
 
     /**
@@ -51,7 +63,7 @@ final class ActivityLog
      */
     public function record(string $action, string $summary, ?string $route = null, array $routeParameters = [], ?Actor $actor = null): void
     {
-        $actor ??= $this->currentActor($this->security->getUser());
+        $actor ??= $this->currentActor();
 
         $this->entityManager->persist(new ActivityEntry(
             $this->clock->now(),

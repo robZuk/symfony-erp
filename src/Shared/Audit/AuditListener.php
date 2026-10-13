@@ -10,7 +10,6 @@ use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Psr\Clock\ClockInterface;
-use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Logs every creation, change and removal of an Audited entity, whoever makes it and wherever in the code.
@@ -28,7 +27,6 @@ final class AuditListener
 
     public function __construct(
         private readonly ActivityLog $activity,
-        private readonly Security $security,
         private readonly ClockInterface $clock,
         private readonly MoneyExtension $money,
         private readonly QuantityExtension $quantity,
@@ -76,7 +74,7 @@ final class AuditListener
             return;
         }
 
-        $actor = $this->activity->currentActor($this->security->getUser());
+        $actor = $this->activity->currentActor();
         $connection = $event->getObjectManager()->getConnection();
 
         foreach ($pending as $change) {
