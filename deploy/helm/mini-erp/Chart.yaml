@@ -1,0 +1,8 @@
+apiVersion: v2
+name: mini-erp
+description: Mini-ERP (Symfony) with its Messenger worker and PostgreSQL
+type: application
+# Version of the chart itself; bump it when the templates change
+version: 0.1.0
+# Version of the application; the image tag actually deployed comes from values (image.tag)
+appVersion: "1.0.0"

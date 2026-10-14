@@ -1,0 +1,48 @@
+{{- $component := dict "component" "worker" "Release" .Release -}}
+# Messenger worker: generates invoice PDFs and sends e-mails in the background.
+# Same image as the web pods, different command, no network port.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+  labels:
+    {{- include "mini-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "mini-erp.selector" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mini-erp.selector" $component | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+      # Time to finish the message being handled after SIGTERM, before the pod is killed
+      terminationGracePeriodSeconds: 60
+      initContainers:
+        {{- include "mini-erp.waitForMigrations" . | nindent 8 }}
+      containers:
+        - name: worker
+          image: {{ include "mini-erp.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # The worker stops after an hour or above 128 MB on its own; Kubernetes starts a fresh one,
+          # which keeps PHP memory leaks in check
+          command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=128M"]
+          env:
+            {{- include "mini-erp.appEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext:
+            {{- include "mini-erp.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - name: invoices
+              mountPath: /app/var/invoices
+      volumes:
+        - name: invoices
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-invoices

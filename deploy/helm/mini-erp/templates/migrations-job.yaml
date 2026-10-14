@@ -1,0 +1,41 @@
+# Brings the database schema up to date, once per install or upgrade.
+# The app pods wait for it in their "wait-for-migrations" init container.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrations
+  labels:
+    {{- include "mini-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrations
+  annotations:
+    # Plain Helm: run after the first install (the database must exist) and before every upgrade
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+    # Argo CD: run during every sync, after the database (wave -1) and before the app (wave 1);
+    # with these annotations Argo CD ignores the Helm hook ones above
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  # Retry a failed migration at most twice before giving up
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "mini-erp.selector" (dict "component" "migrations" "Release" .Release) | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      initContainers:
+        # The database may still be starting
+        - name: wait-for-postgres
+          image: {{ .Values.postgres.image }}
+          command: ["sh", "-c", "until pg_isready -h {{ include "mini-erp.postgresHost" . }} -U {{ .Values.postgres.user }}; do sleep 2; done"]
+      containers:
+        - name: migrations
+          image: {{ include "mini-erp.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["php", "bin/console", "doctrine:migrations:migrate", "--no-interaction", "--allow-no-migration"]
+          env:
+            {{- include "mini-erp.appEnv" . | nindent 12 }}
+          securityContext:
+            {{- include "mini-erp.containerSecurity" . | nindent 12 }}

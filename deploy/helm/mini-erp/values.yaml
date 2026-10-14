@@ -1,0 +1,67 @@
+# Default settings. Each environment overrides what differs in its own file
+# (values-k3d.yaml for the local cluster, values-mikrus.yaml for production).
+
+image:
+    repository: ghcr.io/robzuk/symfony-erp
+    tag: latest
+    # IfNotPresent: download the image only when the node does not have this tag yet
+    pullPolicy: IfNotPresent
+
+# Address of the application, used by the Ingress and for links in e-mails
+host: mini-erp.localhost
+# Scheme seen by the browser; "https" when TLS is terminated in front of the cluster
+scheme: http
+
+# Secret with APP_SECRET, POSTGRES_PASSWORD and MAILER_DSN. It is not created by this chart,
+# so no password ever lands in values files: locally it is made with kubectl, in production
+# it comes from a SealedSecret.
+existingSecret: mini-erp
+
+# Proxies whose X-Forwarded-* headers are trusted: Traefik runs in the pod network of k3s
+trustedProxies: "127.0.0.1,10.42.0.0/16"
+
+# Storage class for all disks; empty means the cluster default (local-path in k3s)
+storageClassName: ""
+
+web:
+    # Two copies, so one keeps serving while the other is replaced during an update
+    replicas: 2
+    resources:
+        requests:
+            cpu: 50m
+            memory: 128Mi
+        limits:
+            memory: 256Mi
+
+worker:
+    replicas: 1
+    resources:
+        requests:
+            cpu: 25m
+            memory: 96Mi
+        limits:
+            memory: 256Mi
+
+# Generated invoice PDFs, shared by the web pods (download) and the worker (generation)
+invoices:
+    size: 1Gi
+
+postgres:
+    image: postgres:16-alpine
+    database: app
+    user: app
+    size: 5Gi
+    resources:
+        requests:
+            cpu: 50m
+            memory: 128Mi
+        limits:
+            memory: 384Mi
+
+backup:
+    enabled: true
+    # Every night at 02:30 (time zone of the cluster, UTC on k3s)
+    schedule: "30 2 * * *"
+    # Dumps older than this are removed
+    keepDays: 7
+    size: 2Gi

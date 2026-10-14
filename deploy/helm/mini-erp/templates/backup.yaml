@@ -1,0 +1,71 @@
+{{- if .Values.backup.enabled }}
+# Disk for database dumps, separate from the database's own disk
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-backup
+  labels:
+    {{- include "mini-erp.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.size }}
+---
+# Nightly compressed dump of the database; dumps older than keepDays are removed
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-backup
+  labels:
+    {{- include "mini-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  # Never run two backups at once
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "mini-erp.selector" (dict "component" "backup" "Release" .Release) | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 70
+          containers:
+            - name: backup
+              image: {{ .Values.postgres.image }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  file=/backup/{{ .Values.postgres.database }}-$(date +%Y%m%d-%H%M%S).sql.gz
+                  pg_dump -h {{ include "mini-erp.postgresHost" . }} -U {{ .Values.postgres.user }} {{ .Values.postgres.database }} | gzip > "$file"
+                  echo "saved $file"
+                  find /backup -name '*.sql.gz' -mtime +{{ .Values.backup.keepDays }} -delete
+              env:
+                # pg_dump reads the password from this variable
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.existingSecret }}
+                      key: POSTGRES_PASSWORD
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: {{ .Release.Name }}-backup
+{{- end }}

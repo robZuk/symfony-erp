@@ -1,0 +1,21 @@
+# Disk for generated invoice PDFs: the worker writes them, the web pods serve them.
+# ReadWriteOnce allows mounts from one node only; with the single-node clusters used here
+# every pod runs on that node, so all of them can mount it. Several nodes would need
+# ReadWriteMany storage (NFS, Longhorn) or object storage (S3) instead.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-invoices
+  labels:
+    {{- include "mini-erp.labels" . | nindent 4 }}
+  annotations:
+    # Keep the PDFs when the chart is uninstalled, like the database
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.invoices.size }}

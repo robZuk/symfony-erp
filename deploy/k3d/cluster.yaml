@@ -1,0 +1,15 @@
+# Local Kubernetes cluster for trying the deployment: `k3d cluster create --config deploy/k3d/cluster.yaml`
+# k3d runs k3s (the distribution used on the production server) inside Docker, so the cluster
+# has the same ingress controller (Traefik) and the same storage class (local-path).
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+    name: mini-erp
+servers: 1
+agents: 0
+image: rancher/k3s:v1.35.5-k3s1
+ports:
+    # Traefik answers on port 80 of the cluster; the app is reachable at http://mini-erp.localhost:8088
+    - port: 8088:80
+      nodeFilters:
+          - loadbalancer
