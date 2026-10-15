@@ -1,4 +1,4 @@
-# Mini-ERP
+# System ERP
 
 System do obsługi sprzedaży hurtowej: od przyjęcia towaru, przez zamówienie i wydanie, po fakturę VAT. Modularny monolit w Symfony 8.1, napisany jako projekt do portfolio.
 

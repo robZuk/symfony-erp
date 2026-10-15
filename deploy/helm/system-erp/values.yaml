@@ -8,14 +8,14 @@ image:
     pullPolicy: IfNotPresent
 
 # Address of the application, used by the Ingress and for links in e-mails
-host: mini-erp.localhost
+host: system-erp.localhost
 # Scheme seen by the browser; "https" when TLS is terminated in front of the cluster
 scheme: http
 
 # Secret with APP_SECRET, POSTGRES_PASSWORD and MAILER_DSN. It is not created by this chart,
 # so no password ever lands in values files: locally it is made with kubectl, in production
 # it comes from a SealedSecret.
-existingSecret: mini-erp
+existingSecret: system-erp
 
 # Proxies whose X-Forwarded-* headers are trusted: Traefik runs in the pod network of k3s
 trustedProxies: "127.0.0.1,10.42.0.0/16"

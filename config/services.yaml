@@ -9,7 +9,7 @@
 parameters:
     # The company that issues the invoices. Demo data: replace with your own.
     app.seller:
-        name: 'Mini-ERP Demo sp. z o.o.'
+        name: 'System ERP Demo sp. z o.o.'
         nip: '1234563218'
         street: 'Przykładowa 1'
         postal_code: '00-001'

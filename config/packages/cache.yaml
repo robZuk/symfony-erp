@@ -2,7 +2,7 @@ framework:
     cache:
         # Unique name of your app: used to compute stable namespaces for cache keys.
         # Fixed, so every running copy of the app reads and writes the same keys.
-        prefix_seed: mini-erp
+        prefix_seed: system-erp
 
         # The "app" cache, which also holds the failed sign-in counts of login throttling,
         # is kept in PostgreSQL so that every running copy of the app shares it.

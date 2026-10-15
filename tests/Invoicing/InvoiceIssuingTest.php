@@ -67,7 +67,7 @@ final class InvoiceIssuingTest extends KernelTestCase
 
         self::assertSame('Hurtownia Elektro sp. z o.o.', $invoice->getBuyer()->name);
         self::assertSame('5260250274', $invoice->getBuyer()->nip);
-        self::assertSame('Mini-ERP Demo sp. z o.o.', $invoice->getSeller()->name);
+        self::assertSame('System ERP Demo sp. z o.o.', $invoice->getSeller()->name);
 
         // To the grosz the same as the order: 2,5 x 49,90 = 124,75 (23%), 3 x 20,00 = 60,00 (5%)
         self::assertTrue($invoice->getNetTotal()->equals($order->totals()->net()));

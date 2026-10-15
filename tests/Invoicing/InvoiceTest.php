@@ -59,7 +59,7 @@ final class InvoiceTest extends WebTestCase
         self::assertSelectorTextContains('h1', 'FV/2026/10/0001');
         self::assertSelectorTextContains('[data-test="party-buyer"]', 'Hurtownia Elektro sp. z o.o.');
         self::assertSelectorTextContains('[data-test="party-buyer"]', 'NIP: 5260250274');
-        self::assertSelectorTextContains('[data-test="party-seller"]', 'Mini-ERP Demo sp. z o.o.');
+        self::assertSelectorTextContains('[data-test="party-seller"]', 'System ERP Demo sp. z o.o.');
         self::assertSelectorCount(2, '[data-test="line-row"]');
         self::assertSelectorCount(2, '[data-test="vat-row"]');
         // 99,80 + 22,95 VAT, 20,00 + 1,00 VAT

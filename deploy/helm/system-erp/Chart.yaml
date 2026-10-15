@@ -1,6 +1,6 @@
 apiVersion: v2
-name: mini-erp
-description: Mini-ERP (Symfony) with its Messenger worker and PostgreSQL
+name: system-erp
+description: System ERP (Symfony) with its Messenger worker and PostgreSQL
 type: application
 # Version of the chart itself; bump it when the templates change
 version: 0.1.0

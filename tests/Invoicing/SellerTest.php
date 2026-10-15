@@ -39,7 +39,7 @@ final class SellerTest extends WebTestCase
 
         // The form starts with the defaults from the configuration
         $this->client->request('GET', '/admin/company');
-        self::assertInputValueSame('seller[name]', 'Mini-ERP Demo sp. z o.o.');
+        self::assertInputValueSame('seller[name]', 'System ERP Demo sp. z o.o.');
 
         $this->client->submitForm('Zapisz', [
             'seller[name]' => 'Hurtownia Kabel sp. z o.o.',
@@ -68,7 +68,7 @@ final class SellerTest extends WebTestCase
 
         // The invoice issued earlier still names the company as it was
         $this->client->request('GET', \sprintf('/invoicing/invoices/%d', $before->getId()));
-        self::assertSelectorTextContains('[data-test="party-seller"]', 'Mini-ERP Demo sp. z o.o.');
+        self::assertSelectorTextContains('[data-test="party-seller"]', 'System ERP Demo sp. z o.o.');
         $this->client->request('GET', \sprintf('/invoicing/invoices/%d', $after->getId()));
         self::assertSelectorTextContains('[data-test="party-seller"]', 'Hurtownia Kabel sp. z o.o.');
     }

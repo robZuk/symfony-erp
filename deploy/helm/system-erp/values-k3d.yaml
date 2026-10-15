@@ -1,9 +1,9 @@
 # Local cluster from deploy/k3d/cluster.yaml, with the image built on this machine:
-#   docker build -t mini-erp:local . && k3d image import mini-erp:local -c mini-erp
+#   docker build -t system-erp:local . && k3d image import system-erp:local -c system-erp
 image:
-    repository: mini-erp
+    repository: system-erp
     tag: local
     # The image is imported into the cluster, there is no registry to download it from
     pullPolicy: Never
 
-host: mini-erp.localhost
+host: system-erp.localhost

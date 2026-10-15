@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-web
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
   annotations:
     argocd.argoproj.io/sync-wave: "1"
@@ -12,7 +12,7 @@ spec:
   replicas: {{ .Values.web.replicas }}
   selector:
     matchLabels:
-      {{- include "mini-erp.selector" $component | nindent 6 }}
+      {{- include "system-erp.selector" $component | nindent 6 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -23,22 +23,22 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "mini-erp.selector" $component | nindent 8 }}
+        {{- include "system-erp.selector" $component | nindent 8 }}
     spec:
       securityContext:
         # Mounted disks become writable for the app user's group
         fsGroup: 1000
       initContainers:
-        {{- include "mini-erp.waitForMigrations" . | nindent 8 }}
+        {{- include "system-erp.waitForMigrations" . | nindent 8 }}
       containers:
         - name: web
-          image: {{ include "mini-erp.image" . }}
+          image: {{ include "system-erp.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
               containerPort: 8080
           env:
-            {{- include "mini-erp.appEnv" . | nindent 12 }}
+            {{- include "system-erp.appEnv" . | nindent 12 }}
           # The login page is public and touches PHP, Twig and the session table:
           # if it answers, the app works
           readinessProbe:
@@ -57,7 +57,7 @@ spec:
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
           securityContext:
-            {{- include "mini-erp.containerSecurity" . | nindent 12 }}
+            {{- include "system-erp.containerSecurity" . | nindent 12 }}
           volumeMounts:
             - name: invoices
               mountPath: /app/var/invoices
@@ -72,11 +72,11 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-web
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
 spec:
   selector:
-    {{- include "mini-erp.selector" $component | nindent 4 }}
+    {{- include "system-erp.selector" $component | nindent 4 }}
   ports:
     - name: http
       port: 80
@@ -89,7 +89,7 @@ kind: Ingress
 metadata:
   name: {{ .Release.Name }}-web
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
 spec:
   rules:

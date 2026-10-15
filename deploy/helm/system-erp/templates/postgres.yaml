@@ -3,13 +3,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "mini-erp.postgresHost" . }}
+  name: {{ include "system-erp.postgresHost" . }}
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 spec:
   selector:
-    {{- include "mini-erp.selector" $component | nindent 4 }}
+    {{- include "system-erp.selector" $component | nindent 4 }}
   ports:
     - name: postgres
       port: 5432
@@ -21,21 +21,21 @@ kind: StatefulSet
 metadata:
   name: {{ .Release.Name }}-postgres
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
   annotations:
     # Argo CD creates the database before everything else (lower waves go first)
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  serviceName: {{ include "mini-erp.postgresHost" . }}
+  serviceName: {{ include "system-erp.postgresHost" . }}
   replicas: 1
   selector:
     matchLabels:
-      {{- include "mini-erp.selector" $component | nindent 6 }}
+      {{- include "system-erp.selector" $component | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "mini-erp.selector" $component | nindent 8 }}
+        {{- include "system-erp.selector" $component | nindent 8 }}
     spec:
       securityContext:
         # The postgres image runs as user 70 (alpine); the disk is made writable for that group

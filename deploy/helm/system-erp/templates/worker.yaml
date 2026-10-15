@@ -6,7 +6,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-worker
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
   annotations:
     argocd.argoproj.io/sync-wave: "1"
@@ -14,31 +14,31 @@ spec:
   replicas: {{ .Values.worker.replicas }}
   selector:
     matchLabels:
-      {{- include "mini-erp.selector" $component | nindent 6 }}
+      {{- include "system-erp.selector" $component | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "mini-erp.selector" $component | nindent 8 }}
+        {{- include "system-erp.selector" $component | nindent 8 }}
     spec:
       securityContext:
         fsGroup: 1000
       # Time to finish the message being handled after SIGTERM, before the pod is killed
       terminationGracePeriodSeconds: 60
       initContainers:
-        {{- include "mini-erp.waitForMigrations" . | nindent 8 }}
+        {{- include "system-erp.waitForMigrations" . | nindent 8 }}
       containers:
         - name: worker
-          image: {{ include "mini-erp.image" . }}
+          image: {{ include "system-erp.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           # The worker stops after an hour or above 128 MB on its own; Kubernetes starts a fresh one,
           # which keeps PHP memory leaks in check
           command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=128M"]
           env:
-            {{- include "mini-erp.appEnv" . | nindent 12 }}
+            {{- include "system-erp.appEnv" . | nindent 12 }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
           securityContext:
-            {{- include "mini-erp.containerSecurity" . | nindent 12 }}
+            {{- include "system-erp.containerSecurity" . | nindent 12 }}
           volumeMounts:
             - name: invoices
               mountPath: /app/var/invoices

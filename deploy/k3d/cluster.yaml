@@ -4,12 +4,12 @@
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
-    name: mini-erp
+    name: system-erp
 servers: 1
 agents: 0
 image: rancher/k3s:v1.35.5-k3s1
 ports:
-    # Traefik answers on port 80 of the cluster; the app is reachable at http://mini-erp.localhost:8088
+    # Traefik answers on port 80 of the cluster; the app is reachable at http://system-erp.localhost:8088
     - port: 8088:80
       nodeFilters:
           - loadbalancer

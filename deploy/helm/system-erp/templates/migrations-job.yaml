@@ -5,7 +5,7 @@ kind: Job
 metadata:
   name: {{ .Release.Name }}-migrations
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrations
   annotations:
     # Plain Helm: run after the first install (the database must exist) and before every upgrade
@@ -22,20 +22,20 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "mini-erp.selector" (dict "component" "migrations" "Release" .Release) | nindent 8 }}
+        {{- include "system-erp.selector" (dict "component" "migrations" "Release" .Release) | nindent 8 }}
     spec:
       restartPolicy: Never
       initContainers:
         # The database may still be starting
         - name: wait-for-postgres
           image: {{ .Values.postgres.image }}
-          command: ["sh", "-c", "until pg_isready -h {{ include "mini-erp.postgresHost" . }} -U {{ .Values.postgres.user }}; do sleep 2; done"]
+          command: ["sh", "-c", "until pg_isready -h {{ include "system-erp.postgresHost" . }} -U {{ .Values.postgres.user }}; do sleep 2; done"]
       containers:
         - name: migrations
-          image: {{ include "mini-erp.image" . }}
+          image: {{ include "system-erp.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["php", "bin/console", "doctrine:migrations:migrate", "--no-interaction", "--allow-no-migration"]
           env:
-            {{- include "mini-erp.appEnv" . | nindent 12 }}
+            {{- include "system-erp.appEnv" . | nindent 12 }}
           securityContext:
-            {{- include "mini-erp.containerSecurity" . | nindent 12 }}
+            {{- include "system-erp.containerSecurity" . | nindent 12 }}

@@ -5,7 +5,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ .Release.Name }}-backup
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
 spec:
@@ -23,7 +23,7 @@ kind: CronJob
 metadata:
   name: {{ .Release.Name }}-backup
   labels:
-    {{- include "mini-erp.labels" . | nindent 4 }}
+    {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: backup
 spec:
   schedule: {{ .Values.backup.schedule | quote }}
@@ -37,7 +37,7 @@ spec:
       template:
         metadata:
           labels:
-            {{- include "mini-erp.selector" (dict "component" "backup" "Release" .Release) | nindent 12 }}
+            {{- include "system-erp.selector" (dict "component" "backup" "Release" .Release) | nindent 12 }}
         spec:
           restartPolicy: Never
           securityContext:
@@ -51,7 +51,7 @@ spec:
                 - |
                   set -e
                   file=/backup/{{ .Values.postgres.database }}-$(date +%Y%m%d-%H%M%S).sql.gz
-                  pg_dump -h {{ include "mini-erp.postgresHost" . }} -U {{ .Values.postgres.user }} {{ .Values.postgres.database }} | gzip > "$file"
+                  pg_dump -h {{ include "system-erp.postgresHost" . }} -U {{ .Values.postgres.user }} {{ .Values.postgres.database }} | gzip > "$file"
                   echo "saved $file"
                   find /backup -name '*.sql.gz' -mtime +{{ .Values.backup.keepDays }} -delete
               env:
