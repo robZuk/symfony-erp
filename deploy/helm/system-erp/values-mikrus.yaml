@@ -1,0 +1,10 @@
+# Production: k3s on the Mikrus server eve250, behind the Mikrus subdomain proxy (Cloudflare).
+# The Secret named in existingSecret comes from deploy/mikrus/system-erp-secret.yaml (a SealedSecret).
+image:
+    # The image CI built from this commit; a fixed tag, so the cluster runs a known version
+    tag: c92a0ba
+    pullPolicy: IfNotPresent
+
+host: systemerp.tojest.dev
+# The browser talks HTTPS to Cloudflare, which forwards plain HTTP to the server
+scheme: https

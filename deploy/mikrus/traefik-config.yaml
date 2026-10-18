@@ -1,0 +1,17 @@
+# Settings for the Traefik that k3s installs itself (k3s merges them into its Traefik chart).
+# Requests reach Traefik from the Mikrus proxy (Cloudflare) through the IPv6 forwarder on the host,
+# so they arrive from inside the pod network. Traefik keeps the X-Forwarded-* headers set by the
+# proxy, so the app sees https and the visitor's address instead of Traefik's own view.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        forwardedHeaders:
+          trustedIPs:
+            - 10.42.0.0/16
+            - 127.0.0.1/32
