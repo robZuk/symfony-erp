@@ -14,3 +14,22 @@ notifications:
 # Applications are written by hand in deploy/argocd/, nothing generates them
 applicationSet:
     replicas: 0
+
+configs:
+    cm:
+        # The k3s storage class (local-path) creates a disk only when the first pod using it starts
+        # (WaitForFirstConsumer). By default Argo CD sees such a Pending claim as not ready yet and waits
+        # for it before the next sync wave, but the pods that would use it are in that next wave.
+        # A Pending claim is therefore healthy here; only a lost disk is a problem.
+        resource.customizations.health.PersistentVolumeClaim: |
+            hs = {}
+            if obj.status ~= nil and obj.status.phase == "Lost" then
+                hs.status = "Degraded"
+                hs.message = "The disk behind this claim is gone"
+                return hs
+            end
+            hs.status = "Healthy"
+            if obj.status == nil or obj.status.phase ~= "Bound" then
+                hs.message = "Waiting for the first pod that uses this disk"
+            end
+            return hs
