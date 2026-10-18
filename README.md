@@ -249,6 +249,64 @@ Dane demo to pół roku pracy hurtowni elektroniki: dostawy, kilkadziesiąt zam�
 symfony console app:user:create ja@example.com "Jan Kowalski" --role=ROLE_ADMIN
 ```
 
+### Lokalny Kubernetes (k3d)
+
+Do sprawdzenia wdrożenia przed wysłaniem na serwer. [k3d](https://k3d.io) uruchamia w Dockerze tę samą dystrybucję Kubernetesa co serwer produkcyjny (k3s), razem z Traefikiem jako wejściem HTTP. Aplikację instaluje chart Helma z `deploy/helm/system-erp`. Do codziennego programowania wystarczy `make serve`: tutaj kod jest zamknięty w obrazie, więc każda zmiana wymaga jego przebudowania.
+
+Wymagania: Docker, [k3d](https://k3d.io), [kubectl](https://kubernetes.io/docs/tasks/tools/), [Helm](https://helm.sh).
+
+Pierwsze uruchomienie:
+
+```bash
+k3d cluster create --config deploy/k3d/cluster.yaml   # klaster system-erp, port 8088 → Traefik
+docker build -t system-erp:local .                    # obraz z bieżącego kodu
+k3d image import system-erp:local -c system-erp       # klaster nie widzi obrazów Dockera, trzeba go wgrać
+
+# Hasła trzyma Secret tworzony poza chartem, więc nie trafiają do repozytorium
+kubectl create namespace system-erp
+kubectl -n system-erp create secret generic system-erp \
+  --from-literal=APP_SECRET=$(openssl rand -hex 16) \
+  --from-literal=POSTGRES_PASSWORD=$(openssl rand -hex 16) \
+  --from-literal=MAILER_DSN=null://null
+
+helm upgrade --install system-erp deploy/helm/system-erp \
+  -n system-erp -f deploy/helm/system-erp/values-k3d.yaml
+
+# Obraz nie zawiera danych demo; konto zakłada się w działającym podzie (hasło zostanie zapytane)
+kubectl -n system-erp exec -it deploy/system-erp-web -- \
+  php bin/console app:user:create ja@example.com "Jan Kowalski" --role=ROLE_ADMIN
+```
+
+Aplikacja odpowiada pod http://system-erp.localhost:8088. Najpierw działa job z migracjami, a pody aplikacji czekają na niego, więc pierwszy start trwa do minuty.
+
+Na co dzień:
+
+```bash
+k3d cluster start system-erp     # po restarcie komputera
+k3d cluster stop system-erp      # zatrzymanie; baza i pliki zostają (usuwa je dopiero k3d cluster delete)
+
+# Po zmianie w kodzie: nowy obraz i wymiana podów (tag "local" się nie zmienia, więc trzeba je zrestartować)
+docker build -t system-erp:local .
+k3d image import system-erp:local -c system-erp
+kubectl -n system-erp rollout restart deploy/system-erp-web deploy/system-erp-worker
+
+# Po zmianie w charcie
+helm upgrade system-erp deploy/helm/system-erp -n system-erp -f deploy/helm/system-erp/values-k3d.yaml
+```
+
+Podgląd klastra:
+
+```bash
+k3d cluster list                                   # klastry i czy działają
+kubectl get pods -A                                # wszystkie pody, także systemowe
+kubectl -n system-erp get all,ingress,pvc          # obiekty aplikacji
+kubectl -n system-erp describe pod <pod>           # szczegóły; przyczyna problemu jest w sekcji Events
+kubectl -n system-erp logs deploy/system-erp-web   # logi (-f śledzi na bieżąco)
+helm list -A                                       # zainstalowane charty
+```
+
+Gdy po wybudzeniu komputera pody wiszą w `ContainerCreating`, a w Events jest `lookup registry-1.docker.io`, klaster wystartował przed siecią i nie ma DNS. Pomaga `k3d cluster stop system-erp && k3d cluster start system-erp`. Gdy dysk jest zapełniony w ponad 85%, Kubernetes usuwa nieużywane obrazy, także `system-erp:local`. Pody kończą się wtedy błędem `ErrImageNeverPull` i trzeba ponownie wykonać `k3d image import`.
+
 ## Jakość
 
 ```bash
