@@ -1,0 +1,16 @@
+# Settings for the Argo CD Helm chart (argo/argo-cd) on the Mikrus server: 1 CPU and 4 GB shared with
+# other apps, so only the parts that GitOps from one public repository needs are running.
+#   helm upgrade --install argocd argo-cd --repo https://argoproj.github.io/argo-helm --version 10.9.6 \
+#     -n argocd --create-namespace -f deploy/argocd/values.yaml
+
+# No single sign-on: the built-in admin account is enough for one person
+dex:
+    enabled: false
+
+# No Slack or e-mail messages about deployments
+notifications:
+    enabled: false
+
+# Applications are written by hand in deploy/argocd/, nothing generates them
+applicationSet:
+    replicas: 0
