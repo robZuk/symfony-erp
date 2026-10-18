@@ -91,6 +91,10 @@ metadata:
   labels:
     {{- include "system-erp.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   rules:
     - host: {{ .Values.host }}

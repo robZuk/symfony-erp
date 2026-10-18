@@ -1,0 +1,46 @@
+# HTTPS behind the Mikrus subdomain proxy.
+# Cloudflare terminates TLS and the Mikrus proxy forwards plain HTTP to the server. That proxy always sends
+# X-Forwarded-Proto: http (and HTTPS: on), whatever the browser used; only Cloudflare's CF-Visitor header,
+# {"scheme":"https"} or {"scheme":"http"}, tells the two apart. Symfony reads only X-Forwarded-Proto, so:
+#   1. visitors who came over plain HTTP are redirected to HTTPS before they reach the app,
+#   2. everything that reaches the app therefore came over HTTPS, which the middleware tells Symfony.
+
+# Used by the app's Ingress (annotation in values-mikrus.yaml)
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: mikrus-https
+  namespace: system-erp
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: mikrus-redirect-https
+  namespace: system-erp
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+# Catches plain-HTTP visitors before the Ingress route; the higher priority makes Traefik try it first
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mikrus-redirect-https
+  namespace: system-erp
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`systemerp.tojest.dev`) && HeaderRegexp(`CF-Visitor`, `"scheme":"http"`)
+      priority: 1000
+      middlewares:
+        - name: mikrus-redirect-https
+      # Never reached, the redirect answers first; Traefik requires a backend
+      services:
+        - name: system-erp-web
+          port: http
