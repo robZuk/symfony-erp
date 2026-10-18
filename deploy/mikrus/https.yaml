@@ -3,7 +3,8 @@
 # X-Forwarded-Proto: http (and HTTPS: on), whatever the browser used; only Cloudflare's CF-Visitor header,
 # {"scheme":"https"} or {"scheme":"http"}, tells the two apart. Symfony reads only X-Forwarded-Proto, so:
 #   1. visitors who came over plain HTTP are redirected to HTTPS before they reach the app,
-#   2. everything that reaches the app therefore came over HTTPS, which the middleware tells Symfony.
+#   2. everything that reaches the app therefore came over HTTPS, which the middleware tells Symfony,
+#      with the HTTPS port too: Traefik would report the port it received the request on (80).
 
 # Used by the app's Ingress (annotation in values-mikrus.yaml)
 apiVersion: traefik.io/v1alpha1
@@ -15,6 +16,7 @@ spec:
   headers:
     customRequestHeaders:
       X-Forwarded-Proto: https
+      X-Forwarded-Port: "443"
 ---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
