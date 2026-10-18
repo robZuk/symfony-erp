@@ -1,0 +1,34 @@
+# Argo CD application that deploys the Helm chart with the production values. A new version goes out
+# by changing image.tag in values-mikrus.yaml and pushing to main.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: system-erp
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/robZuk/symfony-erp.git
+    targetRevision: main
+    path: deploy/helm/system-erp
+    helm:
+      # Same release name as the local install, so objects get the same names (system-erp-web, ...)
+      releaseName: system-erp
+      valueFiles:
+        - values-mikrus.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: system-erp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    # The pods wait for the Secret from the "mikrus" application, which may still be on its way
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

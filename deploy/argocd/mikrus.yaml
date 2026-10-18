@@ -1,0 +1,33 @@
+# Argo CD application with the cluster-specific manifests in deploy/mikrus/: the SealedSecret with the
+# app's passwords and the Traefik settings. Registered once with kubectl apply; after that Argo CD keeps
+# the cluster in line with the main branch.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mikrus
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/robZuk/symfony-erp.git
+    targetRevision: main
+    path: deploy/mikrus
+  destination:
+    server: https://kubernetes.default.svc
+    # The SealedSecret goes here; the Traefik settings name their own namespace (kube-system)
+    namespace: system-erp
+  syncPolicy:
+    automated:
+      # Remove from the cluster what was removed from the repository
+      prune: true
+      # Undo changes made in the cluster by hand
+      selfHeal: true
+    syncOptions:
+      # Both applications may be first to need the namespace
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

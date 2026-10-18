@@ -11,6 +11,8 @@ metadata:
   annotations:
     # Keep the PDFs when the chart is uninstalled, like the database
     helm.sh/resource-policy: keep
+    # The same for Argo CD, which ignores the Helm annotation: never prune or delete this disk
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
 spec:
   accessModes: ["ReadWriteOnce"]
   {{- with .Values.storageClassName }}
