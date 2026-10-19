@@ -1,0 +1,9 @@
+[Unit]
+Description=IPv6 port 80 for Traefik (k3s exposes it on IPv4 only)
+
+[Socket]
+ListenStream=[::]:80
+BindIPv6Only=ipv6-only
+
+[Install]
+WantedBy=sockets.target

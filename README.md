@@ -2,6 +2,8 @@
 
 System do obsługi sprzedaży hurtowej: od przyjęcia towaru, przez zamówienie i wydanie, po fakturę VAT. Modularny monolit w Symfony 8.1, napisany jako projekt do portfolio.
 
+**Demo: https://systemerp.tojest.dev** (konta w sekcji [Konta demo](#konta-demo)). Działa w Kubernetesie (k3s) i jest wdrażane przez Argo CD, opis w [docs/wdrozenie.md](docs/wdrozenie.md).
+
 Nie jest to zbiór formularzy CRUD. Pilnuje reguł, które w takim systemie naprawdę bolą: nie da się wydać towaru, którego nie ma, dwa jednoczesne wydania nie przejdą oba, zaksięgowanego dokumentu nie można zmienić, a faktura i jej korekty zawsze sumują się co do grosza.
 
 ![Pulpit](docs/screenshots/dashboard.png)
@@ -307,6 +309,16 @@ helm list -A                                       # zainstalowane charty
 
 Gdy po wybudzeniu komputera pody wiszą w `ContainerCreating`, a w Events jest `lookup registry-1.docker.io`, klaster wystartował przed siecią i nie ma DNS. Pomaga `k3d cluster stop system-erp && k3d cluster start system-erp`. Gdy dysk jest zapełniony w ponad 85%, Kubernetes usuwa nieużywane obrazy, także `system-erp:local`. Pody kończą się wtedy błędem `ErrImageNeverPull` i trzeba ponownie wykonać `k3d image import`.
 
+## Wdrożenie
+
+Produkcja działa na jednym serwerze (Mikrus) w klastrze k3s, w podejściu GitOps: stan serwera opisuje repozytorium, a Argo CD sam go wprowadza.
+
+1. Push na `main` uruchamia GitHub Actions: lint i testy, potem obraz `ghcr.io/robzuk/symfony-erp:<skrót commita>`.
+2. Nowa wersja to zmiana `image.tag` w `deploy/helm/system-erp/values-mikrus.yaml` i commit.
+3. Argo CD wykrywa zmianę, uruchamia migracje i wymienia pody po kolei, bez przerwy w działaniu.
+
+Hasła leżą w repozytorium jako SealedSecret, który odszyfrować może tylko klaster. Baza ma nocny backup, a HTTPS zapewnia Cloudflare przed serwerem. Szczegóły, budowa serwera, procedury (nowe hasło, odtworzenie bazy, dane demo) i diagnostyka: [docs/wdrozenie.md](docs/wdrozenie.md).
+
 ## Jakość
 
 ```bash
@@ -329,7 +341,7 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 - **PHPStan** na poziomie 8 z rozszerzeniami `phpstan-symfony` (zna kontener i jego serwisy) i `phpstan-doctrine` (zna mapowanie encji).
 - **Deptrac** pilnuje granic modułów według `deptrac.yaml`.
 - **PHP-CS-Fixer** stosuje reguły `@Symfony`, a `lint:container`, `lint:twig` i `lint:yaml` walidują konfigurację i szablony.
-- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 jako usługę, instaluje PHP 8.5 i uruchamia `make lint` oraz `make test`.
+- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 jako usługę, instaluje PHP 8.5 i uruchamia `make lint` oraz `make test`. Po udanych testach na `main` buduje obraz i publikuje go w GitHub Container Registry.
 
 ## Technologie
 
@@ -347,6 +359,7 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 | PDF | dompdf | faktury w PDF |
 | Poczta | Symfony Mailer, Mailpit (lokalnie) | wysyłka i podgląd maili |
 | Jakość | PHPUnit 13, PHPStan 2 (poziom 8), Deptrac, PHP-CS-Fixer, GitHub Actions | testy, analiza statyczna, granice modułów, CI |
+| Wdrożenie | Docker (FrankenPHP), Kubernetes (k3s), Helm, Argo CD, Sealed Secrets, Traefik, GitHub Container Registry | obraz, klaster, GitOps, zaszyfrowane hasła, ruch HTTP |
 
 Komponenty Twig z [Symfony UX Toolkit](https://ux.symfony.com/toolkit) odwzorowują wygląd shadcn/ui i są częścią projektu. Kolejne dodaje `symfony console ux:install <komponent> --kit shadcn`.
 
@@ -356,4 +369,4 @@ Blokady wierszy, numeracja i raport miesięczny korzystają ze składni PostgreS
 
 Świadomie poza zakresem: księgowość i rozrachunki, płatności, wycena magazynu, wydania częściowe, korekta ceny na fakturze, wiele walut i wiele firm, KSeF.
 
-Na produkcji worker kolejki trzeba uruchomić osobno (`symfony console messenger:consume async`, np. pod Supervisorem); `make serve` robi to tylko lokalnie.
+Worker kolejki (`messenger:consume async`) lokalnie uruchamia `make serve`, a w Kubernetesie działa jako osobny Deployment (`deploy/helm/system-erp/templates/worker.yaml`).

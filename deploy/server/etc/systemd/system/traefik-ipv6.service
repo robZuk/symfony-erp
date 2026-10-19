@@ -1,0 +1,7 @@
+[Unit]
+Description=Forward IPv6 port 80 to Traefik in k3s
+Requires=traefik-ipv6.socket
+After=traefik-ipv6.socket
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:80

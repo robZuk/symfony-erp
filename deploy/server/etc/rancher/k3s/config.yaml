@@ -1,0 +1,7 @@
+# Unprivileged LXC container on Proxmox (Mikrus): root inside is not root on the host
+kubelet-arg:
+  - feature-gates=KubeletInUserNamespace=true
+kube-proxy-arg:
+  - conntrack-max-per-core=0
+disable-network-policy: true
+write-kubeconfig-mode: "0600"
