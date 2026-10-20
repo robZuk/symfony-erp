@@ -12,8 +12,8 @@ Nie jest to zbiór formularzy CRUD. Pilnuje reguł, które w takim systemie napr
 |---|---|
 | ![Edytor zamówienia](docs/screenshots/order-editor.png) | ![Faktura](docs/screenshots/invoice.png) |
 | Zamówienie: pozycje, ceny z kartoteki i sumy odświeżane na żywo | Faktura z PDF-em generowanym w tle |
-| ![Dokument magazynowy](docs/screenshots/stock-document.png) | ![Pulpit w trybie ciemnym](docs/screenshots/dashboard-dark.png) |
-| Zaksięgowane przyjęcie towaru | Tryb ciemny |
+| ![Dokument magazynowy](docs/screenshots/stock-document.png) | ![Pulpit w trybie jasnym](docs/screenshots/dashboard-light.png) |
+| Zaksięgowane przyjęcie towaru | Tryb jasny |
 
 ## Co potrafi
 
