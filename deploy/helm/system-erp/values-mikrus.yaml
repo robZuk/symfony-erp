@@ -14,7 +14,3 @@ ingress:
         # The Mikrus proxy reports X-Forwarded-Proto: http even for HTTPS visitors;
         # this middleware from deploy/mikrus/https.yaml corrects it (<namespace>-<name>@kubernetescrd)
         traefik.ingress.kubernetes.io/router.middlewares: system-erp-mikrus-https@kubernetescrd
-
-worker:
-    # Temporary: a second worker to watch Argo CD scale a Deployment; back to 1 afterwards
-    replicas: 2
