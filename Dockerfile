@@ -8,7 +8,7 @@ WORKDIR /app
 
 # --- System layer: changes rarely, so it stays cached between builds ---
 # OPcache is already part of the base image
-RUN install-php-extensions intl pdo_pgsql zip \
+RUN install-php-extensions intl pdo_pgsql zip redis amqp soap \
     && mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
     # Port 8080 needs no privileges; without this file capability the binary
     # also starts where privilege escalation is forbidden (Kubernetes securityContext)
@@ -20,7 +20,13 @@ ENV APP_ENV=prod \
     APP_DEBUG=0 \
     COMPOSER_ALLOW_SUPERUSER=1 \
     # Address Caddy listens on; no host name means plain HTTP, TLS is done in front of the app
-    SERVER_NAME=:8080
+    SERVER_NAME=:8080 \
+    # Worker mode: the application boots once and stays in memory, instead of booting for every
+    # request. Twice the throughput and a fraction of the latency (docs/wydajnosc.md); services that
+    # keep state between requests reset it through ResetInterface. Symfony restarts a worker after
+    # 500 requests (FRANKENPHP_LOOP_MAX) to keep slow memory leaks in check. The number of workers is
+    # left to FrankenPHP here; the Helm chart sets it (web.phpWorkers).
+    FRANKENPHP_CONFIG="worker ./public/index.php"
 
 # --- Dependencies: rebuilt only when composer.json or composer.lock change ---
 COPY composer.json composer.lock symfony.lock ./

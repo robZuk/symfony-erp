@@ -128,6 +128,33 @@ class StockLevelRepository extends ServiceEntityRepository
     }
 
     /**
+     * Stock levels of several products with their warehouses, in one query.
+     *
+     * @param list<int> $productIds
+     *
+     * @return list<StockLevel> ordered by product, then warehouse code
+     */
+    public function forProducts(array $productIds): array
+    {
+        if ([] === $productIds) {
+            return [];
+        }
+
+        /** @var list<StockLevel> $levels */
+        $levels = $this->createQueryBuilder('l')
+            ->addSelect('w')
+            ->join('l.warehouse', 'w')
+            ->where('l.productId IN (:products)')
+            ->setParameter('products', $productIds)
+            ->orderBy('l.productId', 'ASC')
+            ->addOrderBy('w.code', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $levels;
+    }
+
+    /**
      * What is available of each product, all warehouses together.
      *
      * @param list<int> $productIds

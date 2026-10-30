@@ -14,9 +14,14 @@ use App\Inventory\Repository\StockLevelRepository;
 use App\Partner\Entity\Partner;
 use App\Sales\Entity\OrderStatus;
 use App\Sales\Service\OrderLifecycle;
+use App\Shared\Event\IntegrationEvent;
+use App\Shared\Event\OrderCancelled;
+use App\Shared\Event\OrderConfirmed;
+use App\Shared\Event\OrderShipped;
 use App\Shared\Inventory\InsufficientStock;
 use App\Tests\Support\CreatesRecords;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class OrderLifecycleTest extends KernelTestCase
 {
@@ -211,6 +216,59 @@ final class OrderLifecycleTest extends KernelTestCase
         self::assertSame(82499, $order->totals()->net()->minor);
         self::assertSame(18975, $order->totals()->vat()->minor);
         self::assertSame(101474, $order->totals()->gross()->minor);
+    }
+
+    public function testEveryStepIsAnnouncedInTheOutbox(): void
+    {
+        $shipped = $this->createOrder($this->customer, $this->warehouse, [[$this->cable, 1000]], new \DateTimeImmutable('2026-10-13'));
+        $this->lifecycle->confirm($shipped);
+        $this->lifecycle->ship($shipped);
+        $draft = $this->createOrder($this->customer, $this->warehouse, [[$this->cable, 1000]]);
+        $this->lifecycle->cancel($draft);
+
+        [$confirmed, $shippedEvent, $cancelled] = $this->outbox();
+
+        self::assertInstanceOf(OrderConfirmed::class, $confirmed);
+        self::assertSame($shipped->getId(), $confirmed->orderId);
+        self::assertSame('ZS/2026/10/0001', $confirmed->number);
+        self::assertSame($this->customer->getId(), $confirmed->customerId);
+        self::assertSame($this->warehouse->getId(), $confirmed->warehouseId);
+
+        self::assertInstanceOf(OrderShipped::class, $shippedEvent);
+        self::assertSame($shipped->getShipmentNumber(), $shippedEvent->goodsIssueNumber);
+
+        // A draft never got a number
+        self::assertInstanceOf(OrderCancelled::class, $cancelled);
+        self::assertSame($draft->getId(), $cancelled->orderId);
+        self::assertNull($cancelled->number);
+    }
+
+    public function testRefusedStepAnnouncesNothing(): void
+    {
+        $order = $this->createOrder($this->customer, $this->warehouse, [[$this->cable, 12000]]);
+
+        try {
+            $this->lifecycle->confirm($order);
+            self::fail('Confirmation should have been rejected.');
+        } catch (InsufficientStock) {
+        }
+
+        self::assertSame([], $this->outbox());
+    }
+
+    /**
+     * @return list<IntegrationEvent> sales events queued in the outbox, in order; the products
+     *                                created by setUp() queue catalog events, which are not looked at here
+     */
+    private function outbox(): array
+    {
+        $transport = self::getContainer()->get('messenger.transport.outbox');
+        self::assertInstanceOf(InMemoryTransport::class, $transport);
+
+        return array_values(array_filter(
+            array_map(static fn ($envelope): object => $envelope->getMessage(), [...$transport->getSent()]),
+            static fn (object $message): bool => $message instanceof IntegrationEvent && str_starts_with($message::routingKey(), 'sales.'),
+        ));
     }
 
     /**

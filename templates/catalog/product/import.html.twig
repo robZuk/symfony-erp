@@ -1,0 +1,81 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Import cennika – System ERP{% endblock %}
+{% block heading %}Import cennika{% endblock %}
+
+{% block page %}
+    <div class="grid gap-6 lg:grid-cols-2">
+        <twig:Card>
+            <twig:Card:Header>
+                <twig:Card:Title>Wgraj plik</twig:Card:Title>
+                <twig:Card:Description>
+                    Produkty są dopasowywane po indeksie: nowe zostaną dodane, istniejące zmienione.
+                    Jeśli choć jeden wiersz jest błędny, katalog się nie zmieni, a raport pokaże wszystkie błędy.
+                </twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content>
+                {{ form_start(form, {attr: {class: 'grid gap-6', novalidate: 'novalidate'}}) }}
+                    {{ form_errors(form) }}
+                    {{ form_row(form.file) }}
+                    <div class="flex justify-end gap-2">
+                        <twig:Button as="a" variant="outline" href="{{ path('catalog_product_index') }}">Anuluj</twig:Button>
+                        <twig:Button type="submit">Importuj</twig:Button>
+                    </div>
+                {{ form_end(form) }}
+            </twig:Card:Content>
+        </twig:Card>
+
+        <twig:Card>
+            <twig:Card:Header>
+                <twig:Card:Title>Format pliku</twig:Card:Title>
+                <twig:Card:Description>
+                    Najprościej wyeksportować obecny katalog, poprawić go w arkuszu i wgrać z powrotem:
+                    <a class="underline" href="{{ path('catalog_product_export', {_format: 'csv'}) }}">CSV</a> albo
+                    <a class="underline" href="{{ path('catalog_product_export', {_format: 'xml'}) }}">XML</a>.
+                </twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content class="grid gap-3 text-sm">
+                <p>Pierwszy wiersz CSV to nazwy kolumn (separator średnik, przecinek albo tabulator; UTF-8 albo Windows-1250). W XML każdy produkt to element <code>&lt;produkt&gt;</code> w <code>&lt;produkty&gt;</code>.</p>
+                <ul class="grid gap-1">
+                    {% for column in columns %}
+                        <li><code>{{ column }}</code>{{ column in required ? ' — wymagana' : ' — opcjonalna; puste pole zostawia obecną wartość' }}</li>
+                    {% endfor %}
+                </ul>
+                <p class="text-muted-foreground">Ceny i ilości z przecinkiem albo kropką (34,90). Stawka VAT: 23, 8, 5, 0, zw. Rodzaj: towar, usługa. Aktywny: tak, nie. Najwyżej 10 000 produktów i 5 MB.</p>
+            </twig:Card:Content>
+        </twig:Card>
+    </div>
+
+    {% if imports is not empty %}
+        <twig:Card class="py-0">
+            <twig:Table>
+                <twig:Table:Header>
+                    <twig:Table:Row>
+                        <twig:Table:Head>Plik</twig:Table:Head>
+                        <twig:Table:Head>Wgrał</twig:Table:Head>
+                        <twig:Table:Head>Kiedy</twig:Table:Head>
+                        <twig:Table:Head>Wynik</twig:Table:Head>
+                    </twig:Table:Row>
+                </twig:Table:Header>
+                <twig:Table:Body>
+                    {% for import in imports %}
+                        <twig:Table:Row data-test="import-row">
+                            <twig:Table:Cell><a class="underline" href="{{ path('catalog_product_import_show', {id: import.id}) }}">{{ import.fileName }}</a></twig:Table:Cell>
+                            <twig:Table:Cell>{{ import.requestedBy }}</twig:Table:Cell>
+                            <twig:Table:Cell>{{ import.createdAt|date('Y-m-d H:i') }}</twig:Table:Cell>
+                            <twig:Table:Cell>
+                                {% if import.status.value == 'done' %}
+                                    <twig:Badge variant="secondary">{{ import.created }} nowych, {{ import.updated }} zmienionych</twig:Badge>
+                                {% elseif import.status.value == 'failed' %}
+                                    <twig:Badge variant="destructive">Błędy: {{ import.problems|length }}</twig:Badge>
+                                {% else %}
+                                    <twig:Badge variant="outline">W trakcie</twig:Badge>
+                                {% endif %}
+                            </twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% endfor %}
+                </twig:Table:Body>
+            </twig:Table>
+        </twig:Card>
+    {% endif %}
+{% endblock %}

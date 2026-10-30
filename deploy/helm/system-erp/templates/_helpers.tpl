@@ -21,9 +21,21 @@ app.kubernetes.io/component: {{ .component }}
 {{ .Release.Name }}-postgres
 {{- end }}
 
+{{- define "system-erp.redisHost" -}}
+{{ .Release.Name }}-redis
+{{- end }}
+
+{{- define "system-erp.rabbitmqHost" -}}
+{{ .Release.Name }}-rabbitmq
+{{- end }}
+
+{{- define "system-erp.elasticsearchHost" -}}
+{{ .Release.Name }}-elasticsearch
+{{- end }}
+
 {{/*
 Environment of every container running the Symfony app (web, worker, migrations).
-Passwords come from the Secret; $(POSTGRES_PASSWORD) is expanded by Kubernetes from the variable defined just before.
+Passwords come from the Secret; $(POSTGRES_PASSWORD) and the others are expanded by Kubernetes from the variables defined before them.
 */}}
 {{- define "system-erp.appEnv" -}}
 - name: APP_ENV
@@ -45,6 +57,29 @@ Passwords come from the Secret; $(POSTGRES_PASSWORD) is expanded by Kubernetes f
       key: POSTGRES_PASSWORD
 - name: DATABASE_URL
   value: "postgresql://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "system-erp.postgresHost" . }}:5432/{{ .Values.postgres.database }}?serverVersion=16&charset=utf8"
+- name: REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret }}
+      key: REDIS_PASSWORD
+- name: REDIS_URL
+  value: "redis://$(REDIS_PASSWORD)@{{ include "system-erp.redisHost" . }}:6379"
+- name: RABBITMQ_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret }}
+      key: RABBITMQ_PASSWORD
+- name: RABBITMQ_DSN
+  value: "amqp://{{ .Values.rabbitmq.user }}:$(RABBITMQ_PASSWORD)@{{ include "system-erp.rabbitmqHost" . }}:5672"
+- name: ELASTICSEARCH_URL
+  value: "http://{{ include "system-erp.elasticsearchHost" . }}:9200"
+- name: ELASTICSEARCH_USERNAME
+  value: elastic
+- name: ELASTICSEARCH_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret }}
+      key: ELASTICSEARCH_PASSWORD
 - name: LOCK_DSN
   value: "postgresql+advisory://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "system-erp.postgresHost" . }}:5432/{{ .Values.postgres.database }}"
 - name: DEFAULT_URI
@@ -68,6 +103,51 @@ capabilities:
 Init container that keeps an app pod waiting until the database schema matches the code,
 so a new version never runs against tables the migration job has not created yet.
 */}}
+{{/*
+Init container that keeps an app pod waiting until Redis and RabbitMQ accept connections.
+Without it a pod started together with them (a fresh install, a restarted node) fails its first
+requests and is restarted a few times before they are up. Only the ports are checked, with the PHP
+of the app image, so it needs no password and works with any version of the image.
+*/}}
+{{- define "system-erp.waitForServices" -}}
+- name: wait-for-services
+  image: {{ include "system-erp.image" . }}
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  command:
+    - php
+    - -r
+    - |
+      foreach (['{{ include "system-erp.redisHost" . }}' => 6379, '{{ include "system-erp.rabbitmqHost" . }}' => 5672] as $host => $port) {
+          while (!@fsockopen($host, $port, $code, $error, 2)) {
+              echo "waiting for $host:$port\n";
+              sleep(3);
+          }
+      }
+  securityContext:
+    {{- include "system-erp.containerSecurity" . | nindent 4 }}
+{{- end }}
+
+{{/*
+Init container of the search index job: Elasticsearch takes up to a minute to start, and building
+the index before it answers would only fail. The web pods do not wait for it: search falls back
+to the database meanwhile.
+*/}}
+{{- define "system-erp.waitForElasticsearch" -}}
+- name: wait-for-elasticsearch
+  image: {{ include "system-erp.image" . }}
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  command:
+    - php
+    - -r
+    - |
+      while (!@fsockopen('{{ include "system-erp.elasticsearchHost" . }}', 9200, $code, $error, 2)) {
+          echo "waiting for {{ include "system-erp.elasticsearchHost" . }}:9200\n";
+          sleep(3);
+      }
+  securityContext:
+    {{- include "system-erp.containerSecurity" . | nindent 4 }}
+{{- end }}
+
 {{- define "system-erp.waitForMigrations" -}}
 - name: wait-for-migrations
   image: {{ include "system-erp.image" . }}

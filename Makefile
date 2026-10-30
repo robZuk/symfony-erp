@@ -9,7 +9,7 @@ PHP ?= symfony php
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
 
-up: ## Start Postgres and Mailpit
+up: ## Start Postgres, Redis, RabbitMQ, Elasticsearch and Mailpit
 	docker compose up -d --wait
 
 down: ## Stop containers
@@ -25,8 +25,9 @@ db: ## Create the dev database and run migrations
 migrate: ## Run pending migrations
 	$(CONSOLE) doctrine:migrations:migrate --no-interaction --allow-no-migration
 
-demo: ## Replace everything in the dev database with demo data
+demo: ## Replace everything in the dev database with demo data, and rebuild the search index from it
 	$(CONSOLE) doctrine:fixtures:load --no-interaction --purge-with-truncate
+	$(CONSOLE) app:search:reindex
 
 css: ## Build the Tailwind stylesheet
 	$(CONSOLE) tailwind:build

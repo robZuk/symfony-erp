@@ -5,6 +5,9 @@ namespace App\Sales\Service;
 use App\Sales\Entity\SalesOrder;
 use App\Shared\Audit\ActivityLog;
 use App\Shared\Catalog\ProductDirectory;
+use App\Shared\Event\OrderCancelled;
+use App\Shared\Event\OrderConfirmed;
+use App\Shared\Event\OrderShipped;
 use App\Shared\Inventory\InsufficientStock;
 use App\Shared\Inventory\StockReservations;
 use App\Shared\Numbering\DocumentNumberGenerator;
@@ -13,6 +16,7 @@ use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\DependencyInjection\Attribute\Target;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Workflow\WorkflowInterface;
 
 /**
@@ -23,7 +27,8 @@ use Symfony\Component\Workflow\WorkflowInterface;
  *   cancel   draft/confirmed -> cancelled   a reservation, if there was one, is given back
  *
  * Which steps are allowed from which status is defined by the "sales_order" workflow.
- * Every method is one transaction: the order and the warehouse change together or not at all.
+ * Every method is one transaction: the order and the warehouse change together or not at all,
+ * and the event announcing the step (App\Shared\Event) is queued in the outbox in that same transaction.
  */
 final class OrderLifecycle
 {
@@ -39,6 +44,7 @@ final class OrderLifecycle
         private readonly DocumentNumberGenerator $numbers,
         private readonly ClockInterface $clock,
         private readonly ActivityLog $activity,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -59,6 +65,7 @@ final class OrderLifecycle
             $order->assignNumber($this->numbers->next(self::NUMBER_SERIES, $order->getOrderDate()));
             $this->workflow->apply($order, 'confirm');
             $this->activity->record('sales.order.confirmed', \sprintf('Potwierdzono zamówienie %s.', $order->title()), 'sales_order_show', ['id' => (int) $order->getId()]);
+            $this->bus->dispatch(new OrderConfirmed((int) $order->getId(), (string) $order->getNumber(), $order->getCustomerId(), $order->getWarehouseId(), $this->clock->now()));
         });
     }
 
@@ -86,6 +93,7 @@ final class OrderLifecycle
             $order->recordShipment($this->clock->now(), $document);
             $this->workflow->apply($order, 'ship');
             $this->activity->record('sales.order.shipped', \sprintf('Wydano zamówienie %s.', $order->title()), 'sales_order_show', ['id' => (int) $order->getId()]);
+            $this->bus->dispatch(new OrderShipped((int) $order->getId(), (string) $order->getNumber(), $order->getCustomerId(), $document[1] ?? null, $this->clock->now()));
         });
     }
 
@@ -104,6 +112,7 @@ final class OrderLifecycle
 
             $this->workflow->apply($order, 'cancel');
             $this->activity->record('sales.order.cancelled', \sprintf('Anulowano zamówienie %s.', $order->title()), 'sales_order_show', ['id' => (int) $order->getId()]);
+            $this->bus->dispatch(new OrderCancelled((int) $order->getId(), $order->getNumber(), $order->getCustomerId(), $this->clock->now()));
         });
     }
 

@@ -15,6 +15,16 @@ security:
             # Ensure dev tools and static assets are always allowed
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
+        # REST API for other systems (everything under /api except the documentation). Stateless:
+        # no session and no cookie, every request carries its key in "Authorization: Bearer <key>".
+        # A missing or wrong key gets 401 with "WWW-Authenticate: Bearer".
+        api:
+            pattern: ^/api(?!/doc)
+            stateless: true
+            entry_point: App\Identity\Security\ApiAuthenticationProblem
+            access_token:
+                token_handler: App\Identity\Security\ApiKeyHandler
+                failure_handler: App\Identity\Security\ApiAuthenticationProblem
         main:
             lazy: true
             provider: app_user_provider
@@ -53,6 +63,10 @@ security:
     # Note: Only the *first* matching rule is applied
     access_control:
         - { path: ^/login$, roles: PUBLIC_ACCESS }
+        # Swagger UI and the OpenAPI description, so that whoever integrates can read them without a key
+        - { path: ^/api/doc, roles: PUBLIC_ACCESS }
+        # Each endpoint also checks the scope it needs (#[IsGranted('ROLE_API_...')])
+        - { path: ^/api, roles: ROLE_API }
         - { path: ^/, roles: ROLE_USER }
 
 when@test:

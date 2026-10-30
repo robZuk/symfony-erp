@@ -9,6 +9,39 @@ framework:
                 retry_strategy:
                     max_retries: 3
                     multiplier: 2
+
+            # Transactional outbox: business events are rows in the same database, written in the same
+            # transaction as the change they describe. The worker relays them to "events" (App\Shared\Event\PublishToBroker).
+            outbox:
+                dsn: 'doctrine://default?queue_name=outbox&auto_setup=0'
+                retry_strategy:
+                    # The broker may be down for a while; keep trying for about an hour before giving up
+                    max_retries: 10
+                    delay: 5000
+                    multiplier: 2
+                    max_delay: 600000
+
+            # RabbitMQ. Events are published to the topic exchange "erp.events" under their routing key,
+            # as JSON, so that systems not written in PHP can read them too. Each subscriber has its own
+            # queue bound to the keys it wants; the queues below are the ones this application consumes.
+            events:
+                dsn: '%env(RABBITMQ_DSN)%'
+                serializer: messenger.transport.symfony_serializer
+                options:
+                    exchange:
+                        name: erp.events
+                        type: topic
+                    queues:
+                        # Dashboard figures computed from invoices (App\Dashboard\Message\ForgetDashboardFigures)
+                        erp.dashboard:
+                            binding_keys: ['invoicing.invoice.*']
+                        # Product search index (App\Catalog\Message\IndexProduct)
+                        erp.search:
+                            binding_keys: ['catalog.product.*']
+                retry_strategy:
+                    max_retries: 3
+                    multiplier: 2
+
             failed: 'doctrine://default?queue_name=failed'
             # sync: 'sync://'
 
@@ -24,6 +57,11 @@ framework:
 
             # Invoice PDFs are rendered by the background worker: symfony console messenger:consume async
             App\Invoicing\Message\GenerateInvoicePdf: async
+            # Price list imports, which may take longer than a web request should
+            App\Catalog\Message\ImportProducts: async
+
+            # Business events go to the outbox first, never straight to the broker
+            App\Shared\Event\IntegrationEvent: outbox
 
 when@test:
     framework:
@@ -31,3 +69,5 @@ when@test:
             transports:
                 # Messages are kept in memory, so tests can check what was queued and run the handler themselves
                 async: 'in-memory://'
+                outbox: 'in-memory://'
+                events: 'in-memory://'

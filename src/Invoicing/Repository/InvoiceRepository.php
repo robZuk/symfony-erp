@@ -7,6 +7,7 @@ use App\Invoicing\Entity\Invoice;
 use App\Shared\Pagination\Page;
 use App\Shared\Pagination\Paginator;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -42,6 +43,26 @@ class InvoiceRepository extends ServiceEntityRepository
         $page = Paginator::paginate($queryBuilder, $filter->page);
 
         return $page;
+    }
+
+    /**
+     * Invoices and corrections issued in the month of the given date, in the order they were issued.
+     * Read in batches, so a busy month does not have to fit in memory at once.
+     *
+     * @return iterable<Invoice>
+     */
+    public function issuedIn(\DateTimeImmutable $month): iterable
+    {
+        $from = $month->modify('first day of this month')->setTime(0, 0);
+
+        return $this->createQueryBuilder('i')
+            ->where('i.issueDate >= :from AND i.issueDate < :to')
+            ->setParameter('from', $from, Types::DATE_IMMUTABLE)
+            ->setParameter('to', $from->modify('+1 month'), Types::DATE_IMMUTABLE)
+            ->orderBy('i.issueDate', 'ASC')
+            ->addOrderBy('i.id', 'ASC')
+            ->getQuery()
+            ->toIterable();
     }
 
     /**

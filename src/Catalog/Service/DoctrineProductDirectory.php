@@ -43,6 +43,21 @@ final class DoctrineProductDirectory implements ProductDirectory
         return array_map(self::summarize(...), $products);
     }
 
+    public function findBySkus(array $skus): array
+    {
+        $skus = array_values(array_unique(array_map(static fn (string $sku): string => mb_strtoupper(trim($sku)), $skus)));
+        if ([] === $skus) {
+            return [];
+        }
+
+        $summaries = [];
+        foreach ($this->products->findBy(['sku' => $skus]) as $product) {
+            $summaries[$product->getSku()] = self::summarize($product);
+        }
+
+        return $summaries;
+    }
+
     public function sellable(): array
     {
         return array_map(self::summarize(...), $this->products->findBy(['active' => true], ['name' => 'ASC']));

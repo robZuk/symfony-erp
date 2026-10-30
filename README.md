@@ -79,14 +79,18 @@ Wszystkie moduły mają ten sam układ katalogów:
 
 | Katalog | Zawartość |
 |---|---|
-| `Controller` | Cienkie kontrolery (`AbstractController`). Routing, uprawnienia i CSRF są atrybutami (`#[Route]`, `#[IsGranted]`, `#[IsCsrfTokenValid]`), a parametry list (filtry, strona) wiąże `#[MapQueryString]` z obiektem DTO. |
+| `Controller` | Cienkie kontrolery (`AbstractController`), w `Controller/Api` kontrolery REST API. Routing, uprawnienia i CSRF są atrybutami (`#[Route]`, `#[IsGranted]`, `#[IsCsrfTokenValid]`), a parametry list (filtry, strona) wiąże `#[MapQueryString]` z obiektem DTO. |
 | `Dto` | Filtry list (`OrderFilter`, `ProductFilter` …) i dane formularzy (`OrderDraft`, `IssueInvoice`, `DocumentHeader`) z walidacją `#[Assert\…]` |
 | `Entity` | Encje Doctrine z zachowaniem (np. `block()`, przejścia statusów), a nie tylko gettery i settery |
 | `Form` | Formularze Symfony Form dla ekranów edycji |
 | `Repository` | Zapytania, wyszukiwanie ze stronicowaniem, blokady wierszy |
 | `Service` | Operacje biznesowe: jedna metoda to jedna transakcja (np. `OrderLifecycle::confirm()`, `InvoiceIssuing`, `StockPosting`) |
 | `Twig` | Live Components i komponenty Twig należące do modułu |
-| `Message` | Wiadomości Messengera i ich handlery (tylko `Invoicing`) |
+| `Message` | Wiadomości Messengera i ich handlery: PDF faktury (`Invoicing`), import cennika i subskrybenci zdarzeń z RabbitMQ (`Catalog`, `Dashboard`) |
+| `Search` | Tylko `Catalog`: indeks i zapytania Elasticsearch |
+| `Exchange`, `Export` | Pliki: cennik CSV/XML (`Catalog\Exchange`), rejestr sprzedaży CSV (`Invoicing\Export`) |
+| `Command` | Polecenia konsoli (`app:user:create`, `app:api-key:create`, `app:search:reindex`) |
+| `Api` | Zasoby REST API (`ProductResource`, `OrderResource` …): to, co widzi klient API, oddzielone od encji |
 
 Tabele mają prefiks modułu (`identity_user`, `inventory_stock_level`, `shared_document_sequence`), więc w bazie od razu widać, kto jest właścicielem danych. Schemat zmienia się wyłącznie migracjami Doctrine (`migrations/`).
 
@@ -186,6 +190,129 @@ Generowanie PDF-a jest wolne, więc nie dzieje się w żądaniu HTTP:
 
 Asynchronicznie wysyłane są też maile i powiadomienia Notifiera.
 
+### Zdarzenia biznesowe i RabbitMQ
+
+Moduły i systemy zewnętrzne (sklep, wyszukiwarka, hurtownia danych) dowiadują się o zmianach ze zdarzeń, a nie przez odpytywanie bazy. Zdarzenia leżą w `App\Shared\Event`, bo widzi je każdy moduł:
+
+| Zdarzenie | Klucz routingu | Kto je wysyła |
+|---|---|---|
+| `OrderConfirmed` | `sales.order.confirmed` | `Sales\Service\OrderLifecycle::confirm()` |
+| `OrderShipped` | `sales.order.shipped` | `OrderLifecycle::ship()` |
+| `OrderCancelled` | `sales.order.cancelled` | `OrderLifecycle::cancel()` |
+| `InvoiceIssued` | `invoicing.invoice.issued` | `Invoicing\Service\InvoiceIssuing` (faktura i korekta) |
+
+```mermaid
+flowchart LR
+    S[OrderLifecycle<br/>InvoiceIssuing] -->|ta sama transakcja| O[(outbox<br/>tabela w PostgreSQL)]
+    O -->|worker: PublishToBroker| X{{RabbitMQ<br/>exchange erp.events}}
+    X -->|invoicing.invoice.*| Q[kolejka erp.dashboard] --> D[ForgetDashboardFigures]
+    X -.->|własne kolejki| E[inne systemy]
+```
+
+1. **Outbox.** Zdarzenie jest wysyłane w transakcji, która zmienia dane, i trafia do transportu `outbox`, czyli do tabeli w tej samej bazie. Wysyłka prosto do RabbitMQ mogłaby się udać przy wycofanej transakcji (świat dowiaduje się o zamówieniu, którego nie ma) albo nie udać przy zatwierdzonej (zdarzenie ginie). Wiersz w tej samej transakcji istnieje dokładnie wtedy, gdy zmiana.
+2. **Przekaźnik.** Worker czyta outbox, a `Shared\Event\PublishToBroker` publikuje zdarzenie do exchange'a `erp.events` (typ topic) z kluczem z `routingKey()`. Gdy broker nie działa, wiersz czeka i jest ponawiany przez około godzinę. Handler ma `fromTransport: 'outbox'`, więc zdarzenie odebrane z RabbitMQ nie wraca do brokera w pętli.
+3. **Format.** Zdarzenia przechodzą jako JSON (`messenger.transport.symfony_serializer`), z prostymi wartościami: identyfikatory, numery, kwoty w groszach, daty w ISO 8601. Odbiorca nie musi być napisany w PHP. Opublikowanego pola nie zmienia się ani nie usuwa.
+4. **Subskrybenci.** Każdy ma własną kolejkę powiązaną z kluczami, które go interesują (`sales.order.*`, `invoicing.#`). ERP sam subskrybuje kolejkę `erp.dashboard`: `Dashboard\Message\ForgetDashboardFigures` po każdej fakturze usuwa z Redisa zapamiętaną sprzedaż.
+5. **Co najmniej raz.** Zdarzenie może rzadko dotrzeć dwa razy (opublikowane, ale worker padł przed potwierdzeniem wiersza), więc subskrybenci działają idempotentnie. Błąd subskrybenta jest ponawiany przez kolejki opóźnień RabbitMQ, a potem trafia do transportu `failed`.
+
+Kolejki i wiadomości podgląda się w panelu RabbitMQ: lokalnie adres wypisuje `symfony var:export RABBITMQ_MANAGEMENT_URL` (login `guest`/`guest`), a w klastrze `kubectl -n system-erp exec system-erp-rabbitmq-0 -- rabbitmqctl list_queues`.
+
+### Wyszukiwarka produktów (Elasticsearch)
+
+Lista produktów bez wpisanej frazy pochodzi z PostgreSQL, więc produkt widać od razu po zapisaniu. Wyszukiwanie po słowach idzie przez Elasticsearch (`Catalog\Search\ProductSearch`), który znajduje to, czego `LIKE` nie znajdzie:
+
+| Wpisane | Znaleziony produkt | Dzięki czemu |
+|---|---|---|
+| `ladowarka` | Ładowarka sieciowa GaN 65 W | analizator z `asciifolding`: bez wielkich liter i polskich znaków |
+| `sluchawki blutooth` | Słuchawki nauszne Bluetooth | `fuzziness: AUTO`: jedna lub dwie literówki, zależnie od długości słowa |
+| `kab hd` | Kabel HDMI 2.1, 2 m | `edge_ngram`: początki słów, jeszcze w trakcie pisania |
+| `KAB-HDMI-2M` | ten produkt na pierwszym miejscu | dokładny indeks waży najwięcej (`boost`) |
+
+Obok wyników są liczniki według rodzaju i stawki VAT (agregacje). Każdy licznik uwzględnia drugi filtr, ale nie siebie (`post_filter`), więc po wybraniu „Usługa” nadal widać, ile jest towarów.
+
+**PostgreSQL jest źródłem prawdy, a Elasticsearch tylko indeksem.** Wyszukiwarka zwraca same identyfikatory w kolejności trafności, a produkty są ładowane z bazy. Gdy Elasticsearch nie odpowiada (2 s timeoutu, bez ponowień), `ProductFinder` loguje ostrzeżenie i szuka w bazie, a strona mówi, że wyniki są uproszczone.
+
+**Aktualizacja indeksu:**
+
+1. `ProductRepository::save()` w tej samej transakcji odkłada w outboxie `ProductChanged`. Zdarzenie przechodzi przez RabbitMQ do kolejki `erp.search`.
+2. `Catalog\Message\IndexProduct` czyta produkt z bazy i zapisuje go w indeksie. Zapisuje stan z bazy, a nie z treści zdarzenia, więc zdarzenie spóźnione, podwójne albo wyprzedzone przez nowsze niczego nie psuje. W indeksie produkt pojawia się po około sekundzie.
+3. `app:search:reindex` buduje cały indeks od nowa, obok obecnego (`products-20261030-101500-123`), i jednym atomowym `_aliases` przenosi na niego alias `products`, usuwając stary. Wyszukiwanie przez cały czas działa, a nieudana przebudowa niczego nie zmienia. Z `--if-missing` polecenie robi coś tylko wtedy, gdy indeksu nie ma (pierwsze wdrożenie). `make demo` uruchamia je po załadowaniu danych.
+
+Indeks ma `dynamic: strict`: pole, którego nie ma w `ProductIndex::definition()`, to błąd zapisu, a nie zgadywanie typu. Zapis pojedynczego produktu ma `require_alias`, więc Elasticsearch nie założy sam indeksu bez mapowania.
+
+### REST API dla innych systemów
+
+API pod `/api` służy systemom zewnętrznym, np. sklepowi internetowemu. **Dokumentacja OpenAPI z Swagger UI jest pod `/api/doc`.** Generuje ją NelmioApiDocBundle z kontrolerów i ich atrybutów, więc nie rozjeżdża się z kodem. Kontrolery API leżą w modułach, których dotyczą (`<Moduł>/Controller/Api`), i korzystają z tych samych serwisów co ekrany.
+
+| Endpoint | Zakres klucza | Co robi |
+|---|---|---|
+| `GET /api/products?q=` | `catalog:read` | produkty; wyszukiwanie jak na ekranie (Elasticsearch, a gdy nie działa, baza) |
+| `GET /api/products/{sku}` | `catalog:read` | jeden produkt |
+| `GET /api/stock?sku=A,B` | `stock:read` | stany w każdym magazynie i razem; nieznane indeksy w `unknown` |
+| `POST /api/orders` | `orders:write` | zamówienie od razu potwierdzone, z rezerwacją towaru; ceny i VAT z katalogu, nie od klienta |
+| `GET /api/orders/{id}` | `orders:read` | status zamówienia, tylko złożonego tym samym kluczem |
+
+**Klucze API.** Wbudowany w Symfony `access_token` na bezstanowym firewallu `api`, z nagłówkiem `Authorization: Bearer erp_…`. W bazie (`identity_api_key`) jest tylko skrót SHA-256 klucza, więc wyciek bazy nie daje działających kluczy. Klucz ma zakresy, które są jego rolami (`#[IsGranted('ROLE_API_ORDERS_WRITE')]`), i może zostać unieważniony. Zakłada się go poleceniem `app:api-key:create`, które pokazuje sekret jeden raz. Limit to 120 zapytań na minutę na klucz (okno przesuwne, liczniki w Redisie). Po jego przekroczeniu klient dostaje 429 z `Retry-After`, a każda odpowiedź podaje `X-RateLimit-Remaining`.
+
+**Idempotencja zamówień.** Gdy połączenie zerwie się przed odpowiedzią, sklep nie wie, czy zamówienie powstało, i ponawia żądanie. Każde `POST /api/orders` niesie więc nagłówek `Idempotency-Key`:
+
+- ten sam klucz i ta sama treść zwracają już złożone zamówienie (200, `Idempotent-Replayed: true`), a towar nie jest rezerwowany drugi raz,
+- ten sam klucz z inną treścią to błąd (422), a nie ciche zwrócenie cudzego zamówienia,
+- równoczesne żądania z jednym kluczem kolejkuje blokada (`symfony/lock`), a unikalny indeks (klient, klucz) w `sales_api_order_request` pilnuje tego w samej bazie,
+- odmowa (np. brak towaru) niczego nie zapisuje, także klucza, więc to samo żądanie może przejść później.
+
+**Błędy** mają jeden kształt, `application/problem+json` (RFC 9457), nadawany przez `Shared\Api\ProblemDetails`:
+
+| Status | Kiedy | Dodatkowo |
+|---|---|---|
+| 400 | brak `Idempotency-Key` | |
+| 401 | brak klucza albo zły klucz | nagłówek `WWW-Authenticate: Bearer` (RFC 6750) |
+| 403 | klucz bez potrzebnego zakresu | bez nazw ról w treści |
+| 404 | nie ma zasobu, także cudzego zamówienia | dzięki temu nie da się sprawdzić, że cudze zamówienie istnieje (OWASP API1, BOLA) |
+| 409 | za mało towaru | `shortages`: indeks, zamówiono, dostępne |
+| 422 | błędne dane, nieznany NIP, magazyn lub produkt | `violations`: pole i komunikat, wszystkie naraz |
+| 429 | przekroczony limit | `Retry-After` |
+| 500 | nieoczekiwany błąd | nigdy nie ujawnia szczegółów; te są w logu |
+
+Kwoty i ilości są w JSON-ie tekstami dziesiętnymi (`"34.90"`, `"2.5"`), a nie liczbami, bo klient czytający je jako `float` traciłby grosze.
+
+### Import i eksport cennika (CSV, XML) oraz rejestr sprzedaży
+
+**Eksport katalogu** (`/catalog/products/export.csv` albo `.xml`) i **import** (Produkty → Import) mają ten sam format, więc działa obieg „eksport → poprawki w arkuszu → import”. Kolumny mają polskie nazwy: `indeks;nazwa;rodzaj;jednostka;cena_netto;stawka_vat;stan_minimalny;aktywny`, a w XML każdy produkt to `<produkt>` w `<produkty>`.
+
+- **Czytanie strumieniowe** (`Catalog\Exchange\PriceListReader`): CSV przez `fgetcsv()`, XML przez `XMLReader::fromStream()`, element po elemencie. Plik nie jest ładowany w całości.
+- **Polski Excel**: separator wykrywany z nagłówka (średnik, przecinek, tabulator), BOM, kodowanie UTF-8 albo Windows-1250 (`iconv`, bo `mbstring` go nie zna), ceny z przecinkiem albo kropką. Eksport CSV zapisuje BOM, średniki i przecinki dziesiętne.
+- **XML bez XXE**: `LIBXML_NONET` i bez podstawiania encji, więc spreparowany plik nie odczyta plików serwera ani adresów z jego sieci.
+- **Wszystko albo nic** (`ProductImporter`): najpierw sprawdzane są wszystkie wiersze, także regułami encji `Product` (`validateProperty()` na roboczym obiekcie, te same co w formularzu). Jeden błędny wiersz i katalog się nie zmienia, a raport podaje każdy błąd z numerem wiersza i kolumną. Potem jedna transakcja zapisuje nowe i zmienione produkty z ich zdarzeniami `ProductChanged`, więc wyszukiwarka aktualizuje się sama. Niezmienione produkty są pomijane.
+- **W tle**: import wykonuje worker (`ImportProducts`), a strona raportu odświeża się sama (Live Component `Catalog:ImportReport`). Wgrany plik leży w bazie, a nie na dysku, bo pod web, który go odebrał, i pod workera nie mają wspólnego dysku. Po imporcie treść pliku jest usuwana, a raport zostaje.
+- Limity to 5 MB i 10 000 produktów. Wiadomość dostarczona dwa razy nie importuje drugi raz.
+
+**Rejestr sprzedaży** (Faktury → Rejestr sprzedaży, `/invoicing/invoices/register.csv?month=2026-10`): jeden wiersz na fakturę lub korektę, netto i VAT osobno dla każdej stawki, dla biura rachunkowego. Korekta ma kwoty ujemne i wskazuje korygowaną fakturę, więc suma kolumny to sprzedaż miesiąca co do grosza. Oba eksporty są wysyłane jako `StreamedResponse`, czyli pisane w trakcie wysyłania.
+
+### Weryfikacja VAT-UE w VIES (SOAP)
+
+Na stronie kontrahenta przycisk „Sprawdź w VIES” pyta unijny rejestr VIES (usługa SOAP `checkVatService`, operacja `checkVat`), czy NIP jest zarejestrowany do transakcji wewnątrzwspólnotowych. Wynik (aktywny lub nie, nazwa z rejestru i data) zostaje zapisany przy kontrahencie, a sprawdzenie trafia do dziennika zdarzeń.
+
+- **WSDL w repozytorium** (`config/soap/checkVatService.wsdl`), a nie pobierany przy starcie, więc aplikacja nie zależy od dostępności serwera Komisji. Kontrakt jest wersjonowany. WSDL podaje adres `http://`, a klient łączy się przez `https://` (`VIES_ENDPOINT`).
+- **`Partner\Vies\ViesSoapClient`** to `SoapClient` z timeoutem 5 s na połączenie i odpowiedź. `ViesVatRegistry` tłumaczy błędy SOAP z dokumentacji VIES (`MS_UNAVAILABLE`, `TIMEOUT`, `MS_MAX_CONCURRENT_REQ`…) na komunikaty, z którymi da się coś zrobić.
+- **„Brak odpowiedzi” to nie „nie”**: `ViesUnavailable` zostawia przy kontrahencie poprzedni wynik i nie trafia do cache. Odpowiedzi trzyma Redis przez dobę, bo rejestracje rzadko się zmieniają, a VIES ogranicza liczbę zapytań do rejestru jednego kraju.
+- **VAT-UE to nie czynny podatnik VAT**: firma może płacić VAT w Polsce i nie mieć VAT-UE. Komunikat mówi to wprost, zamiast sugerować, że firma nie istnieje.
+- **Testy bez sieci**: `tests/Support/FakeViesSoapClient` to prawdziwy klient z prawdziwym WSDL-em, któremu `__doRequest()` zwraca nagrane odpowiedzi SOAP. Testowane są więc też budowa żądania i odczyt odpowiedzi, a test widzi wysłany XML.
+
+### Wydajność i tryb worker FrankenPHP
+
+Aplikacja działa w **trybie worker FrankenPHP**: startuje raz i obsługuje kolejne żądania z pamięci, zamiast uruchamiać się od zera przy każdym. W teście obciążeniowym k6 (`tests/load/k6.js`) daje to 2× więcej żądań na sekundę, 0 błędów zamiast 13% i p95 zamówienia przez API 42 ms zamiast 976 ms. Serwisy z własnym stanem resetuje `ResetInterface` między żądaniami (`tests/Shared/LongRunningProcessTest`). Metodę, wszystkie wyniki i to, co nie zadziałało: [docs/wydajnosc.md](docs/wydajnosc.md).
+
+### Redis: cache i sesje
+
+Wspólny stan wszystkich kopii aplikacji (dwa pody web i worker) jest w Redisie, a nie w tabelach PostgreSQL:
+
+- **Sesje** (`framework.session.handler_id`). Każde żądanie zalogowanego użytkownika czyta sesję, więc baza ma o tyle mniej pracy. Redis sam usuwa wygasłe sesje.
+- **Cache aplikacji** (`cache.app`, adapter `redis_tag_aware`), a w nim liczniki nieudanych logowań z `login_throttling` i cache wyników Doctrine.
+- **Wyliczenia pulpitu** (pula `dashboard.cache`). Sprzedaż z sześciu miesięcy to agregacja po całej tabeli faktur. `DashboardReport` zapamiętuje ją z tagiem `dashboard.sales`, a zdarzenie `InvoiceIssued` usuwa wszystko z tym tagiem. Nowa faktura pojawia się na pulpicie po około sekundzie, gdy worker przekaże zdarzenie.
+
+Blokady (`LOCK_DSN`) zostały w PostgreSQL: blokada advisory działa w tej samej bazie co transakcje, które chroni. W klastrze Redis zapisuje dane na dysk (AOF), więc restart nie wylogowuje użytkowników. Przy braku pamięci usuwa tylko wpisy z terminem ważności (`volatile-lru`), bo listy tagów cache Symfony muszą zostać.
+
 ### Maszyna stanów zamówienia
 
 Statusy i dozwolone przejścia są konfiguracją (Symfony Workflow, `type: state_machine`), a nie rozproszonymi `if`-ami. `OrderLifecycle` przed każdą operacją blokuje zamówienie i sprawdza `workflow->can()`, potem wykonuje skutki uboczne (rezerwacja, WZ, wpis w dzienniku) i dopiero na końcu `workflow->apply()`, wszystko w jednej transakcji.
@@ -208,6 +335,7 @@ Statusy i dozwolone przejścia są konfiguracją (Symfony Workflow, `type: state
 - **Unieważnianie sesji.** `User` implementuje `EquatableInterface`. Po zmianie hasła, ról albo zablokowaniu konta użytkownik z otwartą sesją zostaje wylogowany przy następnym żądaniu.
 - **Ochrona logowania.** `login_throttling` (5 prób na 15 minut, osobny limit na adres IP), CSRF w formularzu logowania, przy wylogowaniu i przy każdej akcji zmieniającej dane.
 - **Podszywanie się** to standardowy `switch_user` firewalla, dostępny tylko dla `ROLE_ADMIN`.
+- **API**: klucze przechowywane jako skrót, zakresy uprawnień, limit zapytań na klucz, a każdy klient widzi tylko swoje zamówienia (szczegóły w sekcji REST API).
 
 ### Interfejs bez własnego JavaScriptu
 
@@ -218,19 +346,28 @@ Statusy i dozwolone przejścia są konfiguracją (Symfony Workflow, `type: state
 
 ## Uruchomienie
 
-Wymagania: PHP 8.5, Composer, [Symfony CLI](https://symfony.com/download), Docker.
+Wymagania: PHP 8.5 z rozszerzeniami `redis`, `amqp` i `soap` (Ubuntu: `sudo apt install php8.5-redis php8.5-amqp php8.5-soap`), Composer, [Symfony CLI](https://symfony.com/download), Docker.
 
 ```bash
 composer install
-make up      # Postgres i Mailpit w Dockerze
+make up      # Postgres, Redis, RabbitMQ, Elasticsearch i Mailpit w Dockerze
 make db      # baza i migracje
-make demo    # dane demonstracyjne (czyści bazę deweloperską!)
-make serve   # serwer; w tle przebudowuje CSS i obsługuje kolejkę
+make demo    # dane demonstracyjne i indeks wyszukiwarki (czyści bazę deweloperską!)
+make serve   # serwer; w tle przebudowuje CSS i obsługuje kolejki
 ```
 
 `make serve` uruchamia serwer na pierwszym wolnym porcie, zwykle http://127.0.0.1:8000. Adres pokaże też `symfony server:status`. Listę wszystkich poleceń wypisuje `make help`.
 
-Kontenery wystawiają porty losowo, więc nie gryzą się z innymi projektami. Symfony CLI sam je odczytuje i przekazuje aplikacji jako `DATABASE_URL` i `MAILER_DSN`, dlatego polecenia konsoli uruchamia się przez `symfony console`, a nie przez `php bin/console`. Maile wysłane przez aplikację przechwytuje Mailpit. Jego panel jest dostępny z paska debugowania Symfony.
+Kontenery wystawiają porty losowo, więc nie gryzą się z innymi projektami. Symfony CLI sam je odczytuje i przekazuje aplikacji jako `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_DSN`, `ELASTICSEARCH_URL` i `MAILER_DSN`, dlatego polecenia konsoli uruchamia się przez `symfony console`, a nie przez `php bin/console`. Maile wysłane przez aplikację przechwytuje Mailpit. Jego panel jest dostępny z paska debugowania Symfony.
+
+### REST API lokalnie
+
+```bash
+symfony console app:api-key:create "Sklep testowy" --scope=catalog:read --scope=stock:read --scope=orders:read --scope=orders:write
+curl -H "Authorization: Bearer erp_…" "http://127.0.0.1:8000/api/products?q=kabel"
+```
+
+Swagger UI: http://127.0.0.1:8000/api/doc. Kliknij „Authorize”, wklej klucz i wywołuj endpointy z przeglądarki. Listę kluczy pokazuje `app:api-key:list`, a unieważnia je `app:api-key:revoke erp_xxxxxxxx`.
 
 ### Konta demo
 
@@ -269,6 +406,9 @@ kubectl create namespace system-erp
 kubectl -n system-erp create secret generic system-erp \
   --from-literal=APP_SECRET=$(openssl rand -hex 16) \
   --from-literal=POSTGRES_PASSWORD=$(openssl rand -hex 16) \
+  --from-literal=REDIS_PASSWORD=$(openssl rand -hex 16) \
+  --from-literal=RABBITMQ_PASSWORD=$(openssl rand -hex 16) \
+  --from-literal=ELASTICSEARCH_PASSWORD=$(openssl rand -hex 16) \
   --from-literal=MAILER_DSN=null://null
 
 helm upgrade --install system-erp deploy/helm/system-erp \
@@ -341,22 +481,28 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 - **PHPStan** na poziomie 8 z rozszerzeniami `phpstan-symfony` (zna kontener i jego serwisy) i `phpstan-doctrine` (zna mapowanie encji).
 - **Deptrac** pilnuje granic modułów według `deptrac.yaml`.
 - **PHP-CS-Fixer** stosuje reguły `@Symfony`, a `lint:container`, `lint:twig` i `lint:yaml` walidują konfigurację i szablony.
-- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 jako usługę, instaluje PHP 8.5 i uruchamia `make lint` oraz `make test`. Po udanych testach na `main` buduje obraz i publikuje go w GitHub Container Registry.
+- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 i Elasticsearch 9 jako usługi, instaluje PHP 8.5 (z `redis` i `amqp`) i uruchamia `make lint` oraz `make test`. Po udanych testach na `main` buduje obraz i publikuje go w GitHub Container Registry.
 
 ## Technologie
 
 | Warstwa | Technologia | Do czego |
 |---|---|---|
 | Język i framework | PHP 8.5, Symfony 8.1 | całość; konfiguracja przez atrybuty, autowiring |
-| Baza danych | PostgreSQL 16, Doctrine ORM 3, Doctrine Migrations | dane, blokady wierszy, numeracja, kolejka |
+| Baza danych | PostgreSQL 16, Doctrine ORM 3, Doctrine Migrations | dane, blokady wierszy, numeracja, kolejka i outbox |
+| Cache i sesje | Redis 8 | sesje, cache aplikacji, limit prób logowania, wyliczenia pulpitu |
+| Wyszukiwarka | Elasticsearch 9 (elasticsearch-php) | wyszukiwanie produktów: literówki, polskie znaki, prefiksy, liczniki filtrów |
 | Procesy biznesowe | Symfony Workflow | maszyna stanów zamówienia |
 | Zadania w tle | Symfony Messenger (transport Doctrine) | PDF faktur, maile, powiadomienia |
-| Bezpieczeństwo | Symfony Security, Rate Limiter | logowanie formularzem, role, limit prób, podszywanie się |
+| Zdarzenia | RabbitMQ 4, Symfony Messenger (transport AMQP), transactional outbox | zdarzenia biznesowe dla innych modułów i systemów |
+| Bezpieczeństwo | Symfony Security, Rate Limiter | logowanie formularzem, role, limit prób, podszywanie się, klucze API (`access_token`) |
+| REST API | Symfony Serializer, `#[MapRequestPayload]`, NelmioApiDocBundle (OpenAPI, Swagger UI) | API dla innych systemów, błędy RFC 9457 |
 | Walidacja i formularze | Symfony Validator, Form | formularze edycji, walidacja NIP (`App\Shared\Validator\Nip`) |
 | Interfejs | Twig, Symfony UX: Turbo, Stimulus, TwigComponent, Live Components, UX Icons | ekrany renderowane po stronie serwera |
 | Style | Tailwind CSS 4 (symfonycasts/tailwind-bundle), AssetMapper | CSS i JS bez Node |
 | Komponenty UI | Symfony UX Toolkit (kit shadcn) | przyciski, karty, tabele, dialogi w `templates/components/` |
 | PDF | dompdf | faktury w PDF |
+| Pliki | `SplFileObject`/`fgetcsv`, `XMLReader`, `XMLWriter`, `StreamedResponse` | import i eksport cennika CSV/XML, rejestr sprzedaży |
+| SOAP | PHP `SoapClient`, VIES `checkVatService` | weryfikacja VAT-UE kontrahentów |
 | Poczta | Symfony Mailer, Mailpit (lokalnie) | wysyłka i podgląd maili |
 | Jakość | PHPUnit 13, PHPStan 2 (poziom 8), Deptrac, PHP-CS-Fixer, GitHub Actions | testy, analiza statyczna, granice modułów, CI |
 | Wdrożenie | Docker (FrankenPHP), Kubernetes (k3s), Helm, Argo CD, Sealed Secrets, Traefik, GitHub Container Registry | obraz, klaster, GitOps, zaszyfrowane hasła, ruch HTTP |
@@ -369,4 +515,4 @@ Blokady wierszy, numeracja i raport miesięczny korzystają ze składni PostgreS
 
 Świadomie poza zakresem: księgowość i rozrachunki, płatności, wycena magazynu, wydania częściowe, korekta ceny na fakturze, wiele walut i wiele firm, KSeF.
 
-Worker kolejki (`messenger:consume async`) lokalnie uruchamia `make serve`, a w Kubernetesie działa jako osobny Deployment (`deploy/helm/system-erp/templates/worker.yaml`).
+Worker kolejek (`messenger:consume --all --exclude-receivers=failed`) lokalnie uruchamia `make serve`, a w Kubernetesie działa jako osobny Deployment (`deploy/helm/system-erp/templates/worker.yaml`).

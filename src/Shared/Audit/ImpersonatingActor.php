@@ -14,7 +14,7 @@ final readonly class ImpersonatingActor implements Actor
     ) {
     }
 
-    public function actorId(): int
+    public function actorId(): ?int
     {
         return $this->administrator->actorId();
     }

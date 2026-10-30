@@ -12,20 +12,81 @@
                 <option value="inactive"{{ filter.status == 'inactive' ? ' selected' }}>Wycofane</option>
                 <option value="all"{{ filter.status == 'all' ? ' selected' }}>Wszystkie</option>
             </twig:NativeSelect>
+            <twig:NativeSelect size="sm" name="kind" aria-label="Rodzaj">
+                <option value="">Każdy rodzaj</option>
+                {% for kind in kinds %}
+                    <option value="{{ kind.value }}"{{ filter.kind == kind.value ? ' selected' }}>{{ kind.label }}</option>
+                {% endfor %}
+            </twig:NativeSelect>
+            <twig:NativeSelect size="sm" name="vat" aria-label="Stawka VAT">
+                <option value="">Każda stawka VAT</option>
+                {% for rate in vat_rates %}
+                    <option value="{{ rate.value }}"{{ filter.vat == rate.value ? ' selected' }}>VAT {{ rate.label }}</option>
+                {% endfor %}
+            </twig:NativeSelect>
             <twig:Button type="submit" variant="outline" data-auto-submit-target="submit">Szukaj</twig:Button>
         </form>
 
+        <div class="flex flex-wrap gap-2">
+            <twig:DropdownMenu id="product-export">
+                <twig:DropdownMenu:Trigger>
+                    <twig:Button variant="outline" {{ ...dropdown_menu_trigger_attrs }}>
+                        <twig:ux:icon name="lucide:file-down" data-icon="inline-start" aria-hidden="true" />
+                        Eksport
+                    </twig:Button>
+                </twig:DropdownMenu:Trigger>
+                <twig:DropdownMenu:Content>
+                    <twig:DropdownMenu:Item as="a" href="{{ path('catalog_product_export', {_format: 'csv'}) }}">CSV (Excel)</twig:DropdownMenu:Item>
+                    <twig:DropdownMenu:Item as="a" href="{{ path('catalog_product_export', {_format: 'xml'}) }}">XML</twig:DropdownMenu:Item>
+                </twig:DropdownMenu:Content>
+            </twig:DropdownMenu>
         {% if is_granted('ROLE_CATALOG_EDIT') %}
+            <twig:Button as="a" variant="outline" href="{{ path('catalog_product_import') }}">
+                <twig:ux:icon name="lucide:file-up" data-icon="inline-start" aria-hidden="true" />
+                Import
+            </twig:Button>
             <twig:Button as="a" href="{{ path('catalog_product_new') }}">
                 <twig:ux:icon name="lucide:plus" data-icon="inline-start" aria-hidden="true" />
                 Dodaj produkt
             </twig:Button>
         {% endif %}
+        </div>
     </div>
 
     {# Only this part is replaced when the filters change, so the form above keeps its focus.
        Links inside lead to other pages (target="_top"); the address bar follows the filters without adding a history entry for each one ("replace"). #}
     <turbo-frame id="results" target="_top" data-turbo-action="replace" class="flex flex-col gap-4">
+        {% if list.searchUnavailable %}
+            <twig:Alert data-test="search-unavailable">
+                <twig:Alert:Description>Wyszukiwarka jest chwilowo niedostępna. Wyniki pochodzą z prostego wyszukiwania, które nie wybacza literówek ani pominiętych polskich znaków.</twig:Alert:Description>
+            </twig:Alert>
+        {% endif %}
+
+        {# Counts from Elasticsearch, for a search by words only. Each link narrows the search, or widens it back. #}
+        {% if list.kinds is not null %}
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm" data-test="facets">
+                {% for facet in [
+                    {name: 'kind', label: 'Rodzaj', options: kinds, counts: list.kinds, current: filter.kind},
+                    {name: 'vat', label: 'VAT', options: vat_rates, counts: list.vatRates, current: filter.vat},
+                ] %}
+                    <div class="flex flex-wrap items-center gap-1">
+                        <span class="text-muted-foreground">{{ facet.label }}:</span>
+                        {% for option in facet.options|filter(option => (facet.counts[option.value] ?? 0) > 0) %}
+                            {% set chosen = facet.current == option.value %}
+                            <twig:Button as="a" size="sm" variant="{{ chosen ? 'secondary' : 'ghost' }}"
+                                         href="{{ path('catalog_product_index', filter.toQuery()|merge({(facet.name): chosen ? '' : option.value})|filter(value => value != '')) }}"
+                                         data-test="facet-{{ facet.name }}-{{ option.value }}" aria-pressed="{{ chosen ? 'true' : 'false' }}">
+                                {{ facet.name == 'vat' ? 'VAT ' }}{{ option.label }}
+                                <span class="tabular-nums text-muted-foreground">{{ facet.counts[option.value] }}</span>
+                            </twig:Button>
+                        {% else %}
+                            <span class="text-muted-foreground">—</span>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
         <twig:Card class="py-0">
             <twig:Table>
                 <twig:Table:Header>

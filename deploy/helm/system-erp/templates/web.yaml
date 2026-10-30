@@ -29,6 +29,7 @@ spec:
         # Mounted disks become writable for the app user's group
         fsGroup: 1000
       initContainers:
+        {{- include "system-erp.waitForServices" . | nindent 8 }}
         {{- include "system-erp.waitForMigrations" . | nindent 8 }}
       containers:
         - name: web
@@ -39,6 +40,10 @@ spec:
               containerPort: 8080
           env:
             {{- include "system-erp.appEnv" . | nindent 12 }}
+            # A fixed number of PHP workers, each a copy of the application in memory: FrankenPHP would
+            # otherwise start two per CPU core it sees, and in a container that is the whole node's
+            - name: FRANKENPHP_CONFIG
+              value: "worker ./public/index.php {{ .Values.web.phpWorkers }}"
           # The login page is public and touches PHP, Twig and the session table:
           # if it answers, the app works
           readinessProbe:

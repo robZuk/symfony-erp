@@ -2,5 +2,6 @@
 workers:
     tailwind:
         cmd: ['symfony', 'console', 'tailwind:build', '--watch']
+    # The same transports as the worker in Kubernetes: every one but "failed" (PDFs and e-mails, the outbox relay, subscribed events)
     messenger:
-        cmd: ['symfony', 'console', 'messenger:consume', 'async', '--time-limit=3600']
+        cmd: ['symfony', 'console', 'messenger:consume', '--all', '--exclude-receivers=failed', '--time-limit=3600']

@@ -1,0 +1,16 @@
+framework:
+    rate_limiter:
+        # Requests per API key (App\Identity\Security\ApiRateLimit). A sliding window, so a client cannot
+        # fire twice the limit around the turn of a minute. The counts are in Redis (cache.rate_limiter),
+        # shared by every web pod.
+        api:
+            policy: sliding_window
+            limit: '%env(int:API_RATE_LIMIT)%'
+            interval: '1 minute'
+
+when@test:
+    framework:
+        rate_limiter:
+            # Low enough for a test to reach it; every test uses a key of its own
+            api:
+                limit: 10

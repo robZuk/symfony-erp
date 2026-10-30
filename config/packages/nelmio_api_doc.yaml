@@ -1,0 +1,26 @@
+# OpenAPI description of the REST API, generated from the controllers and their attributes,
+# so it cannot drift from the code. Swagger UI: /api/doc, the JSON itself: /api/doc.json
+nelmio_api_doc:
+    documentation:
+        info:
+            title: System ERP API
+            description: |
+                API dla systemów zewnętrznych (np. sklepu internetowego): katalog produktów,
+                stany magazynowe, składanie zamówień i ich status.
+
+                Każde żądanie wymaga klucza API w nagłówku `Authorization: Bearer <klucz>`.
+                Klucz zakłada administrator poleceniem `app:api-key:create` i nadaje mu zakresy
+                (`catalog:read`, `stock:read`, `orders:read`, `orders:write`).
+                Błędy mają postać `application/problem+json` (RFC 9457).
+            version: 1.0.0
+        components:
+            securitySchemes:
+                apiKey:
+                    type: http
+                    scheme: bearer
+                    description: Klucz API, np. erp_3f9c…
+        security:
+            - apiKey: []
+    areas:
+        path_patterns:
+            - ^/api(?!/doc) # Routes under /api, except the documentation itself

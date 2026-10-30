@@ -19,7 +19,41 @@ services:
       # - ./docker/db/data:/var/lib/postgresql/data:rw
 ###< doctrine/doctrine-bundle ###
 
+  # Cache, sessions and the login throttling counts, shared by every running copy of the app
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      retries: 5
+
+  # Broker for the events other systems subscribe to (exchange "erp.events"); the management UI is on port 15672
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Product search (index "products"); a single node without authentication, for development only
+  elasticsearch:
+    image: elasticsearch:9.4.6
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      # Without a limit the JVM would take half of the machine's memory
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s"]
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
 volumes:
 ###> doctrine/doctrine-bundle ###
   database_data:
 ###< doctrine/doctrine-bundle ###
+  elasticsearch_data:

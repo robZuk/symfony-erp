@@ -6,6 +6,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Writes the activity log. Modules call record() right where something worth remembering happens.
@@ -13,7 +14,7 @@ use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
  * Inside a transaction the entry is saved together with the change it describes, so the log never
  * mentions something that was rolled back. Outside one it is saved straight away.
  */
-final class ActivityLog
+final class ActivityLog implements ResetInterface
 {
     public const string SYSTEM = 'System';
 
@@ -33,6 +34,15 @@ final class ActivityLog
     public function onBehalfOf(?Actor $actor): void
     {
         $this->onBehalfOf = $actor;
+    }
+
+    /**
+     * Forgets onBehalfOf() between two requests or messages of a long-running process (kernel.reset),
+     * so that one request can never be logged under the person named by another.
+     */
+    public function reset(): void
+    {
+        $this->onBehalfOf = null;
     }
 
     /**

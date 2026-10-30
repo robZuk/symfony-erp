@@ -18,6 +18,15 @@ interface ProductDirectory
     public function findMany(array $ids): array;
 
     /**
+     * Products by SKU, as systems outside the application know them; SKUs are compared in upper case.
+     *
+     * @param list<string> $skus
+     *
+     * @return array<string, ProductSummary> indexed by SKU; unknown SKUs are left out
+     */
+    public function findBySkus(array $skus): array;
+
+    /**
      * Active products that are kept in stock, ordered by name.
      *
      * @return list<ProductSummary>

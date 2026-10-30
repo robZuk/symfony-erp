@@ -22,14 +22,29 @@ jobs:
                     --health-interval 5s
                     --health-timeout 5s
                     --health-retries 10
+            # Product search tests run against a real Elasticsearch, like the application
+            elasticsearch:
+                image: elasticsearch:9.4.6
+                env:
+                    discovery.type: single-node
+                    xpack.security.enabled: 'false'
+                    ES_JAVA_OPTS: -Xms512m -Xmx512m
+                ports:
+                    - 9200:9200
+                options: >-
+                    --health-cmd "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 30
         env:
             DATABASE_URL: 'postgresql://app:!ChangeMe!@127.0.0.1:5432/app?serverVersion=16&charset=utf8'
+            ELASTICSEARCH_URL: 'http://127.0.0.1:9200'
         steps:
             - uses: actions/checkout@v4
             - uses: shivammathur/setup-php@v2
               with:
                   php-version: '8.5'
-                  extensions: intl, pdo_pgsql
+                  extensions: intl, pdo_pgsql, redis, amqp, soap
                   coverage: none
             - run: composer install --no-interaction --no-progress
             - run: make lint CONSOLE="php bin/console" PHP=php

@@ -9,6 +9,7 @@ use App\Invoicing\Entity\PaymentMethod;
 use App\Invoicing\Message\GenerateInvoicePdf;
 use App\Shared\Audit\ActivityLog;
 use App\Shared\Catalog\ProductDirectory;
+use App\Shared\Event\InvoiceIssued;
 use App\Shared\Numbering\DocumentNumberGenerator;
 use App\Shared\Partner\PartnerDirectory;
 use App\Shared\Persistence\Transactional;
@@ -21,7 +22,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Issues invoices and corrections. Each method is one transaction that numbers the document,
- * saves it, updates the order and queues the PDF; if any part fails, none of it happens.
+ * saves it, updates the order, queues the PDF and announces the invoice (InvoiceIssued);
+ * if any part fails, none of it happens.
  */
 final class InvoiceIssuing
 {
@@ -93,6 +95,7 @@ final class InvoiceIssuing
             $this->orders->markInvoiced($order->id, (int) $invoice->getId(), $invoice->getNumber());
             $this->activity->record('invoicing.invoice.issued', \sprintf('Wystawiono fakturę %s dla %s.', $invoice->getNumber(), $invoice->getBuyer()->name), 'invoicing_invoice_show', ['id' => (int) $invoice->getId()]);
             $this->queuePdf($invoice);
+            $this->announce($invoice);
 
             return $invoice;
         });
@@ -180,6 +183,7 @@ final class InvoiceIssuing
             $this->entityManager->flush();
             $this->activity->record('invoicing.invoice.corrected', \sprintf('Wystawiono korektę %s do faktury %s.', $correction->getNumber(), $original->getNumber()), 'invoicing_invoice_show', ['id' => (int) $correction->getId()]);
             $this->queuePdf($correction);
+            $this->announce($correction);
 
             return $correction;
         });
@@ -193,5 +197,22 @@ final class InvoiceIssuing
         // With the "doctrine" transport the message is a row in the same database, written in the same
         // transaction as the invoice: the worker can never see a message for an invoice that was rolled back
         $this->bus->dispatch(new GenerateInvoicePdf((int) $invoice->getId()));
+    }
+
+    /**
+     * Queues the event in the outbox, in the transaction that issues the invoice.
+     */
+    private function announce(Invoice $invoice): void
+    {
+        $this->bus->dispatch(new InvoiceIssued(
+            (int) $invoice->getId(),
+            $invoice->getNumber(),
+            $invoice->isCorrection(),
+            $invoice->getOrderId(),
+            $invoice->getNetTotal()->minor,
+            $invoice->getGrossTotal()->minor,
+            $invoice->getIssueDate(),
+            $this->clock->now(),
+        ));
     }
 }
