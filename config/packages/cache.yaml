@@ -16,6 +16,9 @@ framework:
             dashboard.cache:
                 adapter: cache.app
                 default_lifetime: 3600
+            # Answers of the EU VAT register (App\Partner\Vies\ViesVatRegistry), kept for a day
+            vies.cache:
+                adapter: cache.app
 
 when@test:
     framework:
@@ -25,4 +28,6 @@ when@test:
             pools:
                 # Kept in memory, so figures cached by one test never show up in the next
                 dashboard.cache:
+                    adapter: cache.adapter.array
+                vies.cache:
                     adapter: cache.adapter.array

@@ -6,6 +6,9 @@ use App\Partner\Dto\PartnerFilter;
 use App\Partner\Entity\Partner;
 use App\Partner\Form\PartnerType;
 use App\Partner\Repository\PartnerRepository;
+use App\Partner\Vies\VatRegistry;
+use App\Partner\Vies\ViesUnavailable;
+use App\Shared\Audit\ActivityLog;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -73,5 +76,50 @@ final class PartnerController extends AbstractController
         ));
 
         return $this->redirectToRoute('partner_index', status: Response::HTTP_SEE_OTHER);
+    }
+
+    /**
+     * Asks the EU VAT register (VIES) whether the partner's NIP is registered for intra-Community
+     * transactions (VAT-UE), and keeps the answer on the partner.
+     */
+    #[Route('/{id}/vat-eu', name: 'vat_eu', methods: ['POST'])]
+    #[IsGranted('ROLE_PARTNER_EDIT')]
+    #[IsCsrfTokenValid('partner_vat_eu')]
+    public function checkVatEu(Partner $partner, VatRegistry $registry, ActivityLog $activity): Response
+    {
+        $back = $this->redirectToRoute('partner_edit', ['id' => $partner->getId()], Response::HTTP_SEE_OTHER);
+        if (null === $partner->getNip()) {
+            $this->addFlash('error', 'Kontrahent nie ma NIP-u, nie ma czego sprawdzać.');
+
+            return $back;
+        }
+
+        try {
+            $check = $registry->check('PL', $partner->getNip());
+        } catch (ViesUnavailable $exception) {
+            // No answer is not a "no": the partner keeps what was known before
+            $this->addFlash('error', $exception->getMessage().' Spróbuj ponownie za chwilę.');
+
+            return $back;
+        }
+
+        $partner->recordVatEuCheck($check);
+        $this->partners->save($partner);
+        $activity->record(
+            'partner.vat_eu.checked',
+            \sprintf('Sprawdzono w VIES kontrahenta %s: %s.', $partner->getName(), $check->valid ? 'aktywny VAT-UE' : 'brak rejestracji VAT-UE'),
+            'partner_edit',
+            ['id' => (int) $partner->getId()],
+        );
+
+        $this->addFlash(
+            $check->valid ? 'success' : 'error',
+            $check->valid
+                ? \sprintf('VIES: PL%s jest aktywny w VAT-UE%s.', $check->vatNumber, null !== $check->name ? ' jako „'.$check->name.'”' : '')
+                // Being absent from VIES only means no intra-Community trade; the company may well be an active VAT payer at home
+                : \sprintf('VIES: PL%s nie jest zarejestrowany do transakcji wewnątrzwspólnotowych (VAT-UE). To nie znaczy, że firma nie istnieje ani że nie jest czynnym podatnikiem VAT w Polsce.', $check->vatNumber),
+        );
+
+        return $back;
     }
 }

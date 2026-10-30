@@ -3,6 +3,7 @@
 namespace App\Partner\Entity;
 
 use App\Partner\Repository\PartnerRepository;
+use App\Partner\Vies\VatCheck;
 use App\Shared\Audit\Audited;
 use App\Shared\Validator\Nip;
 use App\Shared\Validator\NipValidator;
@@ -54,6 +55,17 @@ class Partner implements Audited
 
     #[ORM\Column]
     private bool $active = true;
+
+    /** Outcome of the last VIES check of the NIP; null while it has never been checked. */
+    #[ORM\Column(nullable: true)]
+    private ?bool $vatEuValid = null;
+
+    /** The name VIES has on record, to compare with ours. */
+    #[ORM\Column(length: 300, nullable: true)]
+    private ?string $vatEuName = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $vatEuCheckedAt = null;
 
     public function __construct()
     {
@@ -142,6 +154,31 @@ class Partner implements Audited
     public function isActive(): bool
     {
         return $this->active;
+    }
+
+    /**
+     * Keeps what VIES answered, so the list and the form show it without asking again.
+     */
+    public function recordVatEuCheck(VatCheck $check): void
+    {
+        $this->vatEuValid = $check->valid;
+        $this->vatEuName = $check->name;
+        $this->vatEuCheckedAt = $check->checkedAt;
+    }
+
+    public function isVatEuValid(): ?bool
+    {
+        return $this->vatEuValid;
+    }
+
+    public function getVatEuName(): ?string
+    {
+        return $this->vatEuName;
+    }
+
+    public function getVatEuCheckedAt(): ?\DateTimeImmutable
+    {
+        return $this->vatEuCheckedAt;
     }
 
     public function setActive(bool $active): void

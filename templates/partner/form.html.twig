@@ -41,4 +41,33 @@
             {{ form_end(form) }}
         </twig:Card:Content>
     </twig:Card>
+
+    {# A separate form: a form cannot sit inside the one above #}
+    {% if partner.id and partner.nip %}
+        <twig:Card class="max-w-2xl" data-test="vat-eu">
+            <twig:Card:Header>
+                <twig:Card:Title>VAT-UE (VIES)</twig:Card:Title>
+                <twig:Card:Description>Czy NIP jest zarejestrowany do transakcji wewnątrzwspólnotowych, według unijnego rejestru VIES.</twig:Card:Description>
+            </twig:Card:Header>
+            <twig:Card:Content class="flex flex-wrap items-center justify-between gap-4">
+                <div class="text-sm">
+                    {% if partner.vatEuValid is null %}
+                        <span class="text-muted-foreground">Jeszcze nie sprawdzano.</span>
+                    {% else %}
+                        {% if partner.vatEuValid %}
+                            <twig:Badge variant="secondary">aktywny VAT-UE</twig:Badge>
+                        {% else %}
+                            <twig:Badge variant="outline">brak rejestracji VAT-UE</twig:Badge>
+                        {% endif %}
+                        {% if partner.vatEuName %}<span class="ms-2">{{ partner.vatEuName }}</span>{% endif %}
+                        <span class="ms-2 text-muted-foreground">sprawdzono {{ partner.vatEuCheckedAt|date('Y-m-d H:i') }}</span>
+                    {% endif %}
+                </div>
+                <form method="post" action="{{ path('partner_vat_eu', {id: partner.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('partner_vat_eu') }}">
+                    <twig:Button type="submit" variant="outline">Sprawdź w VIES</twig:Button>
+                </form>
+            </twig:Card:Content>
+        </twig:Card>
+    {% endif %}
 {% endblock %}

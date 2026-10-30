@@ -289,6 +289,16 @@ Kwoty i ilości są w JSON-ie tekstami dziesiętnymi (`"34.90"`, `"2.5"`), a nie
 
 **Rejestr sprzedaży** (Faktury → Rejestr sprzedaży, `/invoicing/invoices/register.csv?month=2026-10`): jeden wiersz na fakturę lub korektę, netto i VAT osobno dla każdej stawki, dla biura rachunkowego. Korekta ma kwoty ujemne i wskazuje korygowaną fakturę, więc suma kolumny to sprzedaż miesiąca co do grosza. Oba eksporty są wysyłane jako `StreamedResponse`, czyli pisane w trakcie wysyłania.
 
+### Weryfikacja VAT-UE w VIES (SOAP)
+
+Na stronie kontrahenta przycisk „Sprawdź w VIES” pyta unijny rejestr VIES (usługa SOAP `checkVatService`, operacja `checkVat`), czy NIP jest zarejestrowany do transakcji wewnątrzwspólnotowych. Wynik (aktywny lub nie, nazwa z rejestru i data) zostaje zapisany przy kontrahencie, a sprawdzenie trafia do dziennika zdarzeń.
+
+- **WSDL w repozytorium** (`config/soap/checkVatService.wsdl`), a nie pobierany przy starcie, więc aplikacja nie zależy od dostępności serwera Komisji. Kontrakt jest wersjonowany. WSDL podaje adres `http://`, a klient łączy się przez `https://` (`VIES_ENDPOINT`).
+- **`Partner\Vies\ViesSoapClient`** to `SoapClient` z timeoutem 5 s na połączenie i odpowiedź. `ViesVatRegistry` tłumaczy błędy SOAP z dokumentacji VIES (`MS_UNAVAILABLE`, `TIMEOUT`, `MS_MAX_CONCURRENT_REQ`…) na komunikaty, z którymi da się coś zrobić.
+- **„Brak odpowiedzi” to nie „nie”**: `ViesUnavailable` zostawia przy kontrahencie poprzedni wynik i nie trafia do cache. Odpowiedzi trzyma Redis przez dobę, bo rejestracje rzadko się zmieniają, a VIES ogranicza liczbę zapytań do rejestru jednego kraju.
+- **VAT-UE to nie czynny podatnik VAT**: firma może płacić VAT w Polsce i nie mieć VAT-UE. Komunikat mówi to wprost, zamiast sugerować, że firma nie istnieje.
+- **Testy bez sieci**: `tests/Support/FakeViesSoapClient` to prawdziwy klient z prawdziwym WSDL-em, któremu `__doRequest()` zwraca nagrane odpowiedzi SOAP. Testowane są więc też budowa żądania i odczyt odpowiedzi, a test widzi wysłany XML.
+
 ### Redis: cache i sesje
 
 Wspólny stan wszystkich kopii aplikacji (dwa pody web i worker) jest w Redisie, a nie w tabelach PostgreSQL:
@@ -332,7 +342,7 @@ Statusy i dozwolone przejścia są konfiguracją (Symfony Workflow, `type: state
 
 ## Uruchomienie
 
-Wymagania: PHP 8.5 z rozszerzeniami `redis` i `amqp` (Ubuntu: `sudo apt install php8.5-redis php8.5-amqp`), Composer, [Symfony CLI](https://symfony.com/download), Docker.
+Wymagania: PHP 8.5 z rozszerzeniami `redis`, `amqp` i `soap` (Ubuntu: `sudo apt install php8.5-redis php8.5-amqp php8.5-soap`), Composer, [Symfony CLI](https://symfony.com/download), Docker.
 
 ```bash
 composer install
@@ -488,6 +498,7 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 | Komponenty UI | Symfony UX Toolkit (kit shadcn) | przyciski, karty, tabele, dialogi w `templates/components/` |
 | PDF | dompdf | faktury w PDF |
 | Pliki | `SplFileObject`/`fgetcsv`, `XMLReader`, `XMLWriter`, `StreamedResponse` | import i eksport cennika CSV/XML, rejestr sprzedaży |
+| SOAP | PHP `SoapClient`, VIES `checkVatService` | weryfikacja VAT-UE kontrahentów |
 | Poczta | Symfony Mailer, Mailpit (lokalnie) | wysyłka i podgląd maili |
 | Jakość | PHPUnit 13, PHPStan 2 (poziom 8), Deptrac, PHP-CS-Fixer, GitHub Actions | testy, analiza statyczna, granice modułów, CI |
 | Wdrożenie | Docker (FrankenPHP), Kubernetes (k3s), Helm, Argo CD, Sealed Secrets, Traefik, GitHub Container Registry | obraz, klaster, GitOps, zaszyfrowane hasła, ruch HTTP |

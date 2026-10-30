@@ -8,7 +8,7 @@ WORKDIR /app
 
 # --- System layer: changes rarely, so it stays cached between builds ---
 # OPcache is already part of the base image
-RUN install-php-extensions intl pdo_pgsql zip redis amqp \
+RUN install-php-extensions intl pdo_pgsql zip redis amqp soap \
     && mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
     # Port 8080 needs no privileges; without this file capability the binary
     # also starts where privilege escalation is forbidden (Kubernetes securityContext)
