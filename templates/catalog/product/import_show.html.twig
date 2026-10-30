@@ -1,0 +1,13 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Import {{ import.fileName }} – System ERP{% endblock %}
+{% block heading %}Import cennika: {{ import.fileName }}{% endblock %}
+
+{% block page %}
+    <twig:Catalog:ImportReport :import="import" />
+
+    <div class="flex gap-2">
+        <twig:Button as="a" variant="outline" href="{{ path('catalog_product_import') }}">Wgraj kolejny plik</twig:Button>
+        <twig:Button as="a" variant="outline" href="{{ path('catalog_product_index') }}">Produkty</twig:Button>
+    </div>
+{% endblock %}

@@ -14,6 +14,15 @@
         <twig:Button type="submit" variant="outline" data-auto-submit-target="submit">Szukaj</twig:Button>
     </form>
 
+    {# A separate form: choosing a month downloads a file, it does not filter the list #}
+    <form method="get" action="{{ path('invoicing_invoice_register') }}" class="flex flex-wrap items-end gap-2" data-turbo="false">
+        <twig:Input type="month" name="month" value="{{ 'now'|date('Y-m') }}" aria-label="Miesiąc rejestru sprzedaży" class="w-44" required />
+        <twig:Button type="submit" variant="outline">
+            <twig:ux:icon name="lucide:file-spreadsheet" data-icon="inline-start" aria-hidden="true" />
+            Rejestr sprzedaży (CSV)
+        </twig:Button>
+    </form>
+
     {# Only this part is replaced when the filters change, so the form above keeps its focus.
        Links inside lead to other pages (target="_top"); the address bar follows the filters without adding a history entry for each one ("replace"). #}
     <turbo-frame id="results" target="_top" data-turbo-action="replace" class="flex flex-col gap-4">

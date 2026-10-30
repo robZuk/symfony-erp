@@ -57,6 +57,8 @@ framework:
 
             # Invoice PDFs are rendered by the background worker: symfony console messenger:consume async
             App\Invoicing\Message\GenerateInvoicePdf: async
+            # Price list imports, which may take longer than a web request should
+            App\Catalog\Message\ImportProducts: async
 
             # Business events go to the outbox first, never straight to the broker
             App\Shared\Event\IntegrationEvent: outbox

@@ -6,6 +6,7 @@ use App\Invoicing\Dto\InvoiceFilter;
 use App\Invoicing\Dto\IssueInvoice;
 use App\Invoicing\Entity\Invoice;
 use App\Invoicing\Entity\PdfStatus;
+use App\Invoicing\Export\SalesRegisterWriter;
 use App\Invoicing\Form\CorrectInvoiceType;
 use App\Invoicing\Form\IssueInvoiceType;
 use App\Invoicing\Repository\InvoiceRepository;
@@ -19,6 +20,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryParameter;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\Routing\Attribute\Route;
@@ -47,6 +49,32 @@ final class InvoiceController extends AbstractController
     /**
      * Issues the invoice for a shipped order: /invoicing/invoices/new?order=12.
      */
+    /**
+     * The sales register of a month as CSV for the accounting office (?month=2026-10, the current month
+     * by default). Streamed: rows are written while the response is sent.
+     */
+    #[Route('/register.csv', name: 'register', methods: ['GET'])]
+    public function register(
+        SalesRegisterWriter $writer,
+        #[MapQueryParameter(filter: \FILTER_VALIDATE_REGEXP, options: ['regexp' => '/^\d{4}-(0[1-9]|1[0-2])$/'])] ?string $month = null,
+    ): StreamedResponse {
+        $start = null === $month ? $this->clock->now() : new \DateTimeImmutable($month.'-01');
+        $invoices = $this->invoices;
+
+        return new StreamedResponse(
+            static function () use ($writer, $invoices, $start): void {
+                $out = fopen('php://output', 'w') ?: throw new \RuntimeException('Cannot write the response.');
+                $writer->write($invoices->issuedIn($start), $out);
+                fclose($out);
+            },
+            Response::HTTP_OK,
+            [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, \sprintf('rejestr-sprzedazy-%s.csv', $start->format('Y-m'))),
+            ],
+        );
+    }
+
     #[Route('/new', name: 'new', methods: ['GET', 'POST'])]
     #[IsGranted('ROLE_INVOICING_EDIT')]
     public function new(Request $request, BillableOrders $orders, #[MapQueryParameter(options: ['min_range' => 1])] int $order): Response

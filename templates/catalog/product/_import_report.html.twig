@@ -1,0 +1,45 @@
+{# Template of the Catalog:ImportReport Live Component (App\Catalog\Twig\ImportReport). #}
+<div {{ attributes.defaults({class: 'grid gap-4'}) }}
+    {# Keep asking the server only while the worker has not finished #}
+    {% if import.pending %}data-poll="delay(1500)|$render"{% endif %}
+>
+    {% if import.pending %}
+        <twig:Alert data-test="import-pending">
+            <twig:Alert:Description class="flex items-center gap-2">
+                <twig:ux:icon name="lucide:loader-circle" class="size-4 animate-spin" aria-hidden="true" />
+                Plik czeka na przetworzenie. Ta strona odświeży się sama.
+            </twig:Alert:Description>
+        </twig:Alert>
+    {% elseif import.status.value == 'done' %}
+        <twig:Alert data-test="import-done">
+            <twig:Alert:Description>
+                Katalog zaktualizowany: <strong>{{ import.created }}</strong> nowych produktów,
+                <strong>{{ import.updated }}</strong> zmienionych, {{ import.unchanged }} bez zmian.
+            </twig:Alert:Description>
+        </twig:Alert>
+    {% else %}
+        <twig:Alert variant="destructive" data-test="import-failed">
+            <twig:Alert:Description>Katalog nie został zmieniony. Popraw poniższe błędy i wgraj plik ponownie.</twig:Alert:Description>
+        </twig:Alert>
+        <twig:Card class="py-0">
+            <twig:Table>
+                <twig:Table:Header>
+                    <twig:Table:Row>
+                        <twig:Table:Head>Wiersz</twig:Table:Head>
+                        <twig:Table:Head>Kolumna</twig:Table:Head>
+                        <twig:Table:Head>Błąd</twig:Table:Head>
+                    </twig:Table:Row>
+                </twig:Table:Header>
+                <twig:Table:Body>
+                    {% for problem in import.problems %}
+                        <twig:Table:Row data-test="import-problem">
+                            <twig:Table:Cell class="tabular-nums">{{ problem.line ?? '—' }}</twig:Table:Cell>
+                            <twig:Table:Cell><code>{{ problem.column ?? '—' }}</code></twig:Table:Cell>
+                            <twig:Table:Cell>{{ problem.message }}</twig:Table:Cell>
+                        </twig:Table:Row>
+                    {% endfor %}
+                </twig:Table:Body>
+            </twig:Table>
+        </twig:Card>
+    {% endif %}
+</div>

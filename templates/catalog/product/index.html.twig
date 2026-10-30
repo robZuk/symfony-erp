@@ -27,12 +27,30 @@
             <twig:Button type="submit" variant="outline" data-auto-submit-target="submit">Szukaj</twig:Button>
         </form>
 
+        <div class="flex flex-wrap gap-2">
+            <twig:DropdownMenu id="product-export">
+                <twig:DropdownMenu:Trigger>
+                    <twig:Button variant="outline" {{ ...dropdown_menu_trigger_attrs }}>
+                        <twig:ux:icon name="lucide:file-down" data-icon="inline-start" aria-hidden="true" />
+                        Eksport
+                    </twig:Button>
+                </twig:DropdownMenu:Trigger>
+                <twig:DropdownMenu:Content>
+                    <twig:DropdownMenu:Item as="a" href="{{ path('catalog_product_export', {_format: 'csv'}) }}">CSV (Excel)</twig:DropdownMenu:Item>
+                    <twig:DropdownMenu:Item as="a" href="{{ path('catalog_product_export', {_format: 'xml'}) }}">XML</twig:DropdownMenu:Item>
+                </twig:DropdownMenu:Content>
+            </twig:DropdownMenu>
         {% if is_granted('ROLE_CATALOG_EDIT') %}
+            <twig:Button as="a" variant="outline" href="{{ path('catalog_product_import') }}">
+                <twig:ux:icon name="lucide:file-up" data-icon="inline-start" aria-hidden="true" />
+                Import
+            </twig:Button>
             <twig:Button as="a" href="{{ path('catalog_product_new') }}">
                 <twig:ux:icon name="lucide:plus" data-icon="inline-start" aria-hidden="true" />
                 Dodaj produkt
             </twig:Button>
         {% endif %}
+        </div>
     </div>
 
     {# Only this part is replaced when the filters change, so the form above keeps its focus.

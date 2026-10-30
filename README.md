@@ -86,8 +86,9 @@ Wszystkie moduły mają ten sam układ katalogów:
 | `Repository` | Zapytania, wyszukiwanie ze stronicowaniem, blokady wierszy |
 | `Service` | Operacje biznesowe: jedna metoda to jedna transakcja (np. `OrderLifecycle::confirm()`, `InvoiceIssuing`, `StockPosting`) |
 | `Twig` | Live Components i komponenty Twig należące do modułu |
-| `Message` | Wiadomości Messengera i ich handlery: PDF faktury (`Invoicing`), subskrybenci zdarzeń z RabbitMQ (`Catalog`, `Dashboard`) |
+| `Message` | Wiadomości Messengera i ich handlery: PDF faktury (`Invoicing`), import cennika i subskrybenci zdarzeń z RabbitMQ (`Catalog`, `Dashboard`) |
 | `Search` | Tylko `Catalog`: indeks i zapytania Elasticsearch |
+| `Exchange`, `Export` | Pliki: cennik CSV/XML (`Catalog\Exchange`), rejestr sprzedaży CSV (`Invoicing\Export`) |
 | `Command` | Polecenia konsoli (`app:user:create`, `app:api-key:create`, `app:search:reindex`) |
 | `Api` | Zasoby REST API (`ProductResource`, `OrderResource` …): to, co widzi klient API, oddzielone od encji |
 
@@ -274,6 +275,19 @@ API pod `/api` służy systemom zewnętrznym, np. sklepowi internetowemu. **Doku
 | 500 | nieoczekiwany błąd | nigdy nie ujawnia szczegółów; te są w logu |
 
 Kwoty i ilości są w JSON-ie tekstami dziesiętnymi (`"34.90"`, `"2.5"`), a nie liczbami, bo klient czytający je jako `float` traciłby grosze.
+
+### Import i eksport cennika (CSV, XML) oraz rejestr sprzedaży
+
+**Eksport katalogu** (`/catalog/products/export.csv` albo `.xml`) i **import** (Produkty → Import) mają ten sam format, więc działa obieg „eksport → poprawki w arkuszu → import”. Kolumny mają polskie nazwy: `indeks;nazwa;rodzaj;jednostka;cena_netto;stawka_vat;stan_minimalny;aktywny`, a w XML każdy produkt to `<produkt>` w `<produkty>`.
+
+- **Czytanie strumieniowe** (`Catalog\Exchange\PriceListReader`): CSV przez `fgetcsv()`, XML przez `XMLReader::fromStream()`, element po elemencie. Plik nie jest ładowany w całości.
+- **Polski Excel**: separator wykrywany z nagłówka (średnik, przecinek, tabulator), BOM, kodowanie UTF-8 albo Windows-1250 (`iconv`, bo `mbstring` go nie zna), ceny z przecinkiem albo kropką. Eksport CSV zapisuje BOM, średniki i przecinki dziesiętne.
+- **XML bez XXE**: `LIBXML_NONET` i bez podstawiania encji, więc spreparowany plik nie odczyta plików serwera ani adresów z jego sieci.
+- **Wszystko albo nic** (`ProductImporter`): najpierw sprawdzane są wszystkie wiersze, także regułami encji `Product` (`validateProperty()` na roboczym obiekcie, te same co w formularzu). Jeden błędny wiersz i katalog się nie zmienia, a raport podaje każdy błąd z numerem wiersza i kolumną. Potem jedna transakcja zapisuje nowe i zmienione produkty z ich zdarzeniami `ProductChanged`, więc wyszukiwarka aktualizuje się sama. Niezmienione produkty są pomijane.
+- **W tle**: import wykonuje worker (`ImportProducts`), a strona raportu odświeża się sama (Live Component `Catalog:ImportReport`). Wgrany plik leży w bazie, a nie na dysku, bo pod web, który go odebrał, i pod workera nie mają wspólnego dysku. Po imporcie treść pliku jest usuwana, a raport zostaje.
+- Limity to 5 MB i 10 000 produktów. Wiadomość dostarczona dwa razy nie importuje drugi raz.
+
+**Rejestr sprzedaży** (Faktury → Rejestr sprzedaży, `/invoicing/invoices/register.csv?month=2026-10`): jeden wiersz na fakturę lub korektę, netto i VAT osobno dla każdej stawki, dla biura rachunkowego. Korekta ma kwoty ujemne i wskazuje korygowaną fakturę, więc suma kolumny to sprzedaż miesiąca co do grosza. Oba eksporty są wysyłane jako `StreamedResponse`, czyli pisane w trakcie wysyłania.
 
 ### Redis: cache i sesje
 
@@ -473,6 +487,7 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 | Style | Tailwind CSS 4 (symfonycasts/tailwind-bundle), AssetMapper | CSS i JS bez Node |
 | Komponenty UI | Symfony UX Toolkit (kit shadcn) | przyciski, karty, tabele, dialogi w `templates/components/` |
 | PDF | dompdf | faktury w PDF |
+| Pliki | `SplFileObject`/`fgetcsv`, `XMLReader`, `XMLWriter`, `StreamedResponse` | import i eksport cennika CSV/XML, rejestr sprzedaży |
 | Poczta | Symfony Mailer, Mailpit (lokalnie) | wysyłka i podgląd maili |
 | Jakość | PHPUnit 13, PHPStan 2 (poziom 8), Deptrac, PHP-CS-Fixer, GitHub Actions | testy, analiza statyczna, granice modułów, CI |
 | Wdrożenie | Docker (FrankenPHP), Kubernetes (k3s), Helm, Argo CD, Sealed Secrets, Traefik, GitHub Container Registry | obraz, klaster, GitOps, zaszyfrowane hasła, ruch HTTP |

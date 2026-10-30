@@ -34,10 +34,31 @@ class ProductRepository extends ServiceEntityRepository
      */
     public function save(Product $product): void
     {
-        $this->transactional->run(function () use ($product): void {
-            $this->getEntityManager()->persist($product);
+        $this->saveAll([$product]);
+    }
+
+    /**
+     * Saves several products at once (a price list import), each announced like a single save.
+     * Inside a caller's transaction this becomes part of it.
+     *
+     * @param list<Product> $products
+     */
+    public function saveAll(array $products): void
+    {
+        if ([] === $products) {
+            return;
+        }
+
+        $this->transactional->run(function () use ($products): void {
+            foreach ($products as $product) {
+                $this->getEntityManager()->persist($product);
+            }
             $this->getEntityManager()->flush();
-            $this->bus->dispatch(new ProductChanged((int) $product->getId(), $product->getSku(), $this->clock->now()));
+
+            $now = $this->clock->now();
+            foreach ($products as $product) {
+                $this->bus->dispatch(new ProductChanged((int) $product->getId(), $product->getSku(), $now));
+            }
         });
     }
 
