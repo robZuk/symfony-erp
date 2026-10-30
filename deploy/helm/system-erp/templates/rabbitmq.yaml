@@ -40,11 +40,20 @@ spec:
       securityContext:
         # The rabbitmq image runs as user 999; the disk is made writable for that group
         fsGroup: 999
+        # Only when the disk is mounted for the first time. By default Kubernetes makes every file
+        # group-accessible on each mount, and RabbitMQ refuses to start when its .erlang.cookie is
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: rabbitmq
           # The image without the management plugin, which would cost about 100 MB of memory;
           # in production the queues are looked at with: kubectl exec … -- rabbitmqctl list_queues
           image: {{ .Values.rabbitmq.image }}
+          # The Erlang cookie must be readable by its owner only; this also repairs a disk whose
+          # permissions were widened before fsGroupChangePolicy was set
+          command:
+            - sh
+            - -c
+            - chmod 600 /var/lib/rabbitmq/.erlang.cookie 2>/dev/null; exec docker-entrypoint.sh rabbitmq-server
           ports:
             - name: amqp
               containerPort: 5672
