@@ -21,9 +21,17 @@ app.kubernetes.io/component: {{ .component }}
 {{ .Release.Name }}-postgres
 {{- end }}
 
+{{- define "system-erp.redisHost" -}}
+{{ .Release.Name }}-redis
+{{- end }}
+
+{{- define "system-erp.rabbitmqHost" -}}
+{{ .Release.Name }}-rabbitmq
+{{- end }}
+
 {{/*
 Environment of every container running the Symfony app (web, worker, migrations).
-Passwords come from the Secret; $(POSTGRES_PASSWORD) is expanded by Kubernetes from the variable defined just before.
+Passwords come from the Secret; $(POSTGRES_PASSWORD) and the others are expanded by Kubernetes from the variables defined before them.
 */}}
 {{- define "system-erp.appEnv" -}}
 - name: APP_ENV
@@ -45,6 +53,20 @@ Passwords come from the Secret; $(POSTGRES_PASSWORD) is expanded by Kubernetes f
       key: POSTGRES_PASSWORD
 - name: DATABASE_URL
   value: "postgresql://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "system-erp.postgresHost" . }}:5432/{{ .Values.postgres.database }}?serverVersion=16&charset=utf8"
+- name: REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret }}
+      key: REDIS_PASSWORD
+- name: REDIS_URL
+  value: "redis://$(REDIS_PASSWORD)@{{ include "system-erp.redisHost" . }}:6379"
+- name: RABBITMQ_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret }}
+      key: RABBITMQ_PASSWORD
+- name: RABBITMQ_DSN
+  value: "amqp://{{ .Values.rabbitmq.user }}:$(RABBITMQ_PASSWORD)@{{ include "system-erp.rabbitmqHost" . }}:5672"
 - name: LOCK_DSN
   value: "postgresql+advisory://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "system-erp.postgresHost" . }}:5432/{{ .Values.postgres.database }}"
 - name: DEFAULT_URI

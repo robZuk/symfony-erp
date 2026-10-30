@@ -16,6 +16,7 @@ use App\Invoicing\Service\InvoiceIssuing;
 use App\Invoicing\Service\InvoicePdfStorage;
 use App\Partner\Entity\Partner;
 use App\Sales\Entity\OrderStatus;
+use App\Shared\Event\InvoiceIssued;
 use App\Shared\Tax\VatRate;
 use App\Tests\Support\CreatesRecords;
 use Doctrine\ORM\EntityManagerInterface;
@@ -162,6 +163,36 @@ final class InvoiceIssuingTest extends KernelTestCase
         self::assertSame(PdfStatus::Ready, $invoice->getPdfStatus());
         self::assertTrue($storage->exists($invoice));
         self::assertStringStartsWith('%PDF-', (string) file_get_contents($storage->path($invoice)));
+    }
+
+    public function testInvoiceAndCorrectionAreAnnouncedWithTheirTotals(): void
+    {
+        $order = $this->createShippedOrder($this->customer, $this->warehouse, [[$this->cable, 2000]]);
+        $invoice = $this->issuing->issueForOrder((int) $order->getId(), $this->today, 14, PaymentMethod::Transfer);
+        [$line] = $invoice->getLines()->toArray();
+        $correction = $this->issuing->correct($invoice, [(int) $line->getId() => 1000], 'Zwrot', $this->today);
+
+        $transport = self::getContainer()->get('messenger.transport.outbox');
+        self::assertInstanceOf(InMemoryTransport::class, $transport);
+        // The order's own events (confirmed, shipped) are queued too; only the invoices matter here
+        $events = array_values(array_filter(
+            array_map(static fn ($envelope): object => $envelope->getMessage(), [...$transport->getSent()]),
+            static fn (object $message): bool => $message instanceof InvoiceIssued,
+        ));
+
+        self::assertCount(2, $events);
+        [$issued, $corrected] = $events;
+
+        self::assertSame($invoice->getId(), $issued->invoiceId);
+        self::assertSame('FV/2026/10/0001', $issued->number);
+        self::assertFalse($issued->correction);
+        self::assertSame($order->getId(), $issued->orderId);
+        self::assertSame(9980, $issued->netTotal);
+        self::assertSame($invoice->getGrossTotal()->minor, $issued->grossTotal);
+
+        self::assertSame($correction->getId(), $corrected->invoiceId);
+        self::assertTrue($corrected->correction);
+        self::assertSame(-4990, $corrected->netTotal);
     }
 
     public function testCorrectionLowersQuantitiesAndHasNegativeTotals(): void

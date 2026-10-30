@@ -3,9 +3,10 @@ framework:
     secret: '%env(APP_SECRET)%'
 
     # Note that the session will be started ONLY if you read or write from it.
-    # Sessions are kept in PostgreSQL, so every running copy of the app sees the same sign-ins.
+    # Sessions are kept in Redis, so every running copy of the app sees the same sign-ins.
+    # Redis expires them by itself, at the lifetime set by session.gc_maxlifetime.
     session:
-        handler_id: '%env(DATABASE_URL)%'
+        handler_id: '%env(REDIS_URL)%'
 
     #esi: true
     #fragments: true

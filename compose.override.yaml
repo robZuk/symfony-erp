@@ -6,6 +6,15 @@ services:
       - "5432"
 ###< doctrine/doctrine-bundle ###
 
+  redis:
+    ports:
+      - "6379"
+
+  rabbitmq:
+    ports:
+      - "5672"
+      - "15672"
+
 ###> symfony/mailer ###
   mailer:
     image: axllent/mailpit

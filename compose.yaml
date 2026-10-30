@@ -19,6 +19,23 @@ services:
       # - ./docker/db/data:/var/lib/postgresql/data:rw
 ###< doctrine/doctrine-bundle ###
 
+  # Cache, sessions and the login throttling counts, shared by every running copy of the app
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      retries: 5
+
+  # Broker for the events other systems subscribe to (exchange "erp.events"); the management UI is on port 15672
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
 volumes:
 ###> doctrine/doctrine-bundle ###
   database_data:

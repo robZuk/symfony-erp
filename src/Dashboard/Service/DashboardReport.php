@@ -12,6 +12,9 @@ use App\Shared\Catalog\ProductSummary;
 use App\Shared\Money\Money;
 use App\Shared\Partner\PartnerDirectory;
 use Psr\Clock\ClockInterface;
+use Symfony\Component\DependencyInjection\Attribute\Target;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 /**
  * The numbers behind the home page. This is the one place that reads from every module.
@@ -20,6 +23,9 @@ final class DashboardReport
 {
     private const int MONTHS = 6;
 
+    /** Tag of the cached sales figures; ForgetDashboardFigures drops them when an invoice is issued. */
+    public const string SALES_TAG = 'dashboard.sales';
+
     public function __construct(
         private readonly InvoiceRepository $invoices,
         private readonly SalesOrderRepository $orders,
@@ -27,11 +33,15 @@ final class DashboardReport
         private readonly ProductDirectory $products,
         private readonly PartnerDirectory $partners,
         private readonly ClockInterface $clock,
+        #[Target('dashboard.cache')]
+        private readonly TagAwareCacheInterface $cache,
     ) {
     }
 
     /**
      * Net sales (invoices and their corrections) for the last six months, oldest first.
+     *
+     * The sum runs over the whole invoice table, so it is cached in Redis until the next invoice is issued.
      *
      * @return list<array{month: \DateTimeImmutable, net: Money}>
      */
@@ -39,7 +49,14 @@ final class DashboardReport
     {
         $thisMonth = $this->clock->now()->modify('first day of this month')->setTime(0, 0);
         $from = $thisMonth->modify(\sprintf('-%d months', self::MONTHS - 1));
-        $netByMonth = $this->invoices->netByMonthSince($from);
+        $netByMonth = $this->cache->get(
+            'dashboard.sales.'.$from->format('Y-m'),
+            function (ItemInterface $item) use ($from): array {
+                $item->tag(self::SALES_TAG);
+
+                return $this->invoices->netByMonthSince($from);
+            },
+        );
 
         $sales = [];
         for ($month = $from; $month <= $thisMonth; $month = $month->modify('+1 month')) {

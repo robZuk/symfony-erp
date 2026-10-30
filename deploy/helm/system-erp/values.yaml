@@ -16,7 +16,7 @@ ingress:
     # Extra annotations for the Ingress, e.g. Traefik middlewares an environment needs
     annotations: {}
 
-# Secret with APP_SECRET, POSTGRES_PASSWORD and MAILER_DSN. It is not created by this chart,
+# Secret with APP_SECRET, POSTGRES_PASSWORD, REDIS_PASSWORD, RABBITMQ_PASSWORD and MAILER_DSN. It is not created by this chart,
 # so no password ever lands in values files: locally it is made with kubectl, in production
 # it comes from a SealedSecret.
 existingSecret: system-erp
@@ -59,6 +59,30 @@ postgres:
         requests:
             cpu: 50m
             memory: 128Mi
+        limits:
+            memory: 384Mi
+
+redis:
+    image: redis:8-alpine
+    # Above this, entries with an expiry (cache, sessions) are evicted, least recently used first
+    maxMemory: 64mb
+    size: 256Mi
+    resources:
+        requests:
+            cpu: 10m
+            memory: 32Mi
+        limits:
+            memory: 128Mi
+
+rabbitmq:
+    # Without the management plugin, to save memory
+    image: rabbitmq:4-alpine
+    user: erp
+    size: 1Gi
+    resources:
+        requests:
+            cpu: 25m
+            memory: 160Mi
         limits:
             memory: 384Mi
 

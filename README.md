@@ -186,6 +186,43 @@ Generowanie PDF-a jest wolne, więc nie dzieje się w żądaniu HTTP:
 
 Asynchronicznie wysyłane są też maile i powiadomienia Notifiera.
 
+### Zdarzenia biznesowe i RabbitMQ
+
+Moduły i systemy zewnętrzne (sklep, wyszukiwarka, hurtownia danych) dowiadują się o zmianach ze zdarzeń, a nie przez odpytywanie bazy. Zdarzenia leżą w `App\Shared\Event`, bo widzi je każdy moduł:
+
+| Zdarzenie | Klucz routingu | Kto je wysyła |
+|---|---|---|
+| `OrderConfirmed` | `sales.order.confirmed` | `Sales\Service\OrderLifecycle::confirm()` |
+| `OrderShipped` | `sales.order.shipped` | `OrderLifecycle::ship()` |
+| `OrderCancelled` | `sales.order.cancelled` | `OrderLifecycle::cancel()` |
+| `InvoiceIssued` | `invoicing.invoice.issued` | `Invoicing\Service\InvoiceIssuing` (faktura i korekta) |
+
+```mermaid
+flowchart LR
+    S[OrderLifecycle<br/>InvoiceIssuing] -->|ta sama transakcja| O[(outbox<br/>tabela w PostgreSQL)]
+    O -->|worker: PublishToBroker| X{{RabbitMQ<br/>exchange erp.events}}
+    X -->|invoicing.invoice.*| Q[kolejka erp.dashboard] --> D[ForgetDashboardFigures]
+    X -.->|własne kolejki| E[inne systemy]
+```
+
+1. **Outbox.** Zdarzenie jest wysyłane w transakcji, która zmienia dane, i trafia do transportu `outbox`, czyli do tabeli w tej samej bazie. Wysyłka prosto do RabbitMQ mogłaby się udać przy wycofanej transakcji (świat dowiaduje się o zamówieniu, którego nie ma) albo nie udać przy zatwierdzonej (zdarzenie ginie). Wiersz w tej samej transakcji istnieje dokładnie wtedy, gdy zmiana.
+2. **Przekaźnik.** Worker czyta outbox, a `Shared\Event\PublishToBroker` publikuje zdarzenie do exchange'a `erp.events` (typ topic) z kluczem z `routingKey()`. Gdy broker nie działa, wiersz czeka i jest ponawiany przez około godzinę. Handler ma `fromTransport: 'outbox'`, więc zdarzenie odebrane z RabbitMQ nie wraca do brokera w pętli.
+3. **Format.** Zdarzenia przechodzą jako JSON (`messenger.transport.symfony_serializer`), z prostymi wartościami: identyfikatory, numery, kwoty w groszach, daty w ISO 8601. Odbiorca nie musi być napisany w PHP. Opublikowanego pola nie zmienia się ani nie usuwa.
+4. **Subskrybenci.** Każdy ma własną kolejkę powiązaną z kluczami, które go interesują (`sales.order.*`, `invoicing.#`). ERP sam subskrybuje kolejkę `erp.dashboard`: `Dashboard\Message\ForgetDashboardFigures` po każdej fakturze usuwa z Redisa zapamiętaną sprzedaż.
+5. **Co najmniej raz.** Zdarzenie może rzadko dotrzeć dwa razy (opublikowane, ale worker padł przed potwierdzeniem wiersza), więc subskrybenci działają idempotentnie. Błąd subskrybenta jest ponawiany przez kolejki opóźnień RabbitMQ, a potem trafia do transportu `failed`.
+
+Kolejki i wiadomości podgląda się w panelu RabbitMQ: lokalnie adres wypisuje `symfony var:export RABBITMQ_MANAGEMENT_URL` (login `guest`/`guest`), a w klastrze `kubectl -n system-erp exec system-erp-rabbitmq-0 -- rabbitmqctl list_queues`.
+
+### Redis: cache i sesje
+
+Wspólny stan wszystkich kopii aplikacji (dwa pody web i worker) jest w Redisie, a nie w tabelach PostgreSQL:
+
+- **Sesje** (`framework.session.handler_id`). Każde żądanie zalogowanego użytkownika czyta sesję, więc baza ma o tyle mniej pracy. Redis sam usuwa wygasłe sesje.
+- **Cache aplikacji** (`cache.app`, adapter `redis_tag_aware`), a w nim liczniki nieudanych logowań z `login_throttling` i cache wyników Doctrine.
+- **Wyliczenia pulpitu** (pula `dashboard.cache`). Sprzedaż z sześciu miesięcy to agregacja po całej tabeli faktur. `DashboardReport` zapamiętuje ją z tagiem `dashboard.sales`, a zdarzenie `InvoiceIssued` usuwa wszystko z tym tagiem. Nowa faktura pojawia się na pulpicie po około sekundzie, gdy worker przekaże zdarzenie.
+
+Blokady (`LOCK_DSN`) zostały w PostgreSQL: blokada advisory działa w tej samej bazie co transakcje, które chroni. W klastrze Redis zapisuje dane na dysk (AOF), więc restart nie wylogowuje użytkowników. Przy braku pamięci usuwa tylko wpisy z terminem ważności (`volatile-lru`), bo listy tagów cache Symfony muszą zostać.
+
 ### Maszyna stanów zamówienia
 
 Statusy i dozwolone przejścia są konfiguracją (Symfony Workflow, `type: state_machine`), a nie rozproszonymi `if`-ami. `OrderLifecycle` przed każdą operacją blokuje zamówienie i sprawdza `workflow->can()`, potem wykonuje skutki uboczne (rezerwacja, WZ, wpis w dzienniku) i dopiero na końcu `workflow->apply()`, wszystko w jednej transakcji.
@@ -218,19 +255,19 @@ Statusy i dozwolone przejścia są konfiguracją (Symfony Workflow, `type: state
 
 ## Uruchomienie
 
-Wymagania: PHP 8.5, Composer, [Symfony CLI](https://symfony.com/download), Docker.
+Wymagania: PHP 8.5 z rozszerzeniami `redis` i `amqp` (Ubuntu: `sudo apt install php8.5-redis php8.5-amqp`), Composer, [Symfony CLI](https://symfony.com/download), Docker.
 
 ```bash
 composer install
-make up      # Postgres i Mailpit w Dockerze
+make up      # Postgres, Redis, RabbitMQ i Mailpit w Dockerze
 make db      # baza i migracje
 make demo    # dane demonstracyjne (czyści bazę deweloperską!)
-make serve   # serwer; w tle przebudowuje CSS i obsługuje kolejkę
+make serve   # serwer; w tle przebudowuje CSS i obsługuje kolejki
 ```
 
 `make serve` uruchamia serwer na pierwszym wolnym porcie, zwykle http://127.0.0.1:8000. Adres pokaże też `symfony server:status`. Listę wszystkich poleceń wypisuje `make help`.
 
-Kontenery wystawiają porty losowo, więc nie gryzą się z innymi projektami. Symfony CLI sam je odczytuje i przekazuje aplikacji jako `DATABASE_URL` i `MAILER_DSN`, dlatego polecenia konsoli uruchamia się przez `symfony console`, a nie przez `php bin/console`. Maile wysłane przez aplikację przechwytuje Mailpit. Jego panel jest dostępny z paska debugowania Symfony.
+Kontenery wystawiają porty losowo, więc nie gryzą się z innymi projektami. Symfony CLI sam je odczytuje i przekazuje aplikacji jako `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_DSN` i `MAILER_DSN`, dlatego polecenia konsoli uruchamia się przez `symfony console`, a nie przez `php bin/console`. Maile wysłane przez aplikację przechwytuje Mailpit. Jego panel jest dostępny z paska debugowania Symfony.
 
 ### Konta demo
 
@@ -269,6 +306,8 @@ kubectl create namespace system-erp
 kubectl -n system-erp create secret generic system-erp \
   --from-literal=APP_SECRET=$(openssl rand -hex 16) \
   --from-literal=POSTGRES_PASSWORD=$(openssl rand -hex 16) \
+  --from-literal=REDIS_PASSWORD=$(openssl rand -hex 16) \
+  --from-literal=RABBITMQ_PASSWORD=$(openssl rand -hex 16) \
   --from-literal=MAILER_DSN=null://null
 
 helm upgrade --install system-erp deploy/helm/system-erp \
@@ -341,16 +380,18 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 - **PHPStan** na poziomie 8 z rozszerzeniami `phpstan-symfony` (zna kontener i jego serwisy) i `phpstan-doctrine` (zna mapowanie encji).
 - **Deptrac** pilnuje granic modułów według `deptrac.yaml`.
 - **PHP-CS-Fixer** stosuje reguły `@Symfony`, a `lint:container`, `lint:twig` i `lint:yaml` walidują konfigurację i szablony.
-- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 jako usługę, instaluje PHP 8.5 i uruchamia `make lint` oraz `make test`. Po udanych testach na `main` buduje obraz i publikuje go w GitHub Container Registry.
+- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 jako usługę, instaluje PHP 8.5 (z `redis` i `amqp`) i uruchamia `make lint` oraz `make test`. Po udanych testach na `main` buduje obraz i publikuje go w GitHub Container Registry.
 
 ## Technologie
 
 | Warstwa | Technologia | Do czego |
 |---|---|---|
 | Język i framework | PHP 8.5, Symfony 8.1 | całość; konfiguracja przez atrybuty, autowiring |
-| Baza danych | PostgreSQL 16, Doctrine ORM 3, Doctrine Migrations | dane, blokady wierszy, numeracja, kolejka |
+| Baza danych | PostgreSQL 16, Doctrine ORM 3, Doctrine Migrations | dane, blokady wierszy, numeracja, kolejka i outbox |
+| Cache i sesje | Redis 8 | sesje, cache aplikacji, limit prób logowania, wyliczenia pulpitu |
 | Procesy biznesowe | Symfony Workflow | maszyna stanów zamówienia |
 | Zadania w tle | Symfony Messenger (transport Doctrine) | PDF faktur, maile, powiadomienia |
+| Zdarzenia | RabbitMQ 4, Symfony Messenger (transport AMQP), transactional outbox | zdarzenia biznesowe dla innych modułów i systemów |
 | Bezpieczeństwo | Symfony Security, Rate Limiter | logowanie formularzem, role, limit prób, podszywanie się |
 | Walidacja i formularze | Symfony Validator, Form | formularze edycji, walidacja NIP (`App\Shared\Validator\Nip`) |
 | Interfejs | Twig, Symfony UX: Turbo, Stimulus, TwigComponent, Live Components, UX Icons | ekrany renderowane po stronie serwera |
@@ -369,4 +410,4 @@ Blokady wierszy, numeracja i raport miesięczny korzystają ze składni PostgreS
 
 Świadomie poza zakresem: księgowość i rozrachunki, płatności, wycena magazynu, wydania częściowe, korekta ceny na fakturze, wiele walut i wiele firm, KSeF.
 
-Worker kolejki (`messenger:consume async`) lokalnie uruchamia `make serve`, a w Kubernetesie działa jako osobny Deployment (`deploy/helm/system-erp/templates/worker.yaml`).
+Worker kolejek (`messenger:consume async outbox events`) lokalnie uruchamia `make serve`, a w Kubernetesie działa jako osobny Deployment (`deploy/helm/system-erp/templates/worker.yaml`).

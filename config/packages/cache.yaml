@@ -5,15 +5,24 @@ framework:
         prefix_seed: system-erp
 
         # The "app" cache, which also holds the failed sign-in counts of login throttling,
-        # is kept in PostgreSQL so that every running copy of the app shares it.
-        app: cache.adapter.doctrine_dbal
+        # is kept in Redis so that every running copy of the app shares it.
+        # Redis drops expired entries itself, so no table fills up with them.
+        default_redis_provider: '%env(REDIS_URL)%'
+        app: cache.adapter.redis_tag_aware
 
-        # Namespaced pools use the above "app" backend by default
-        #pools:
-            #my.dedicated.cache: null
+        pools:
+            # Home page figures that take an aggregation over whole tables. Entries are tagged,
+            # and App\Dashboard\Message\ForgetDashboardFigures drops them when an event says the data changed.
+            dashboard.cache:
+                adapter: cache.app
+                default_lifetime: 3600
 
 when@test:
     framework:
         cache:
-            # Tests run inside rolled-back database transactions; keep the cache out of them
+            # Tests run without Redis; the file cache outlives a request, as login throttling needs
             app: cache.adapter.filesystem
+            pools:
+                # Kept in memory, so figures cached by one test never show up in the next
+                dashboard.cache:
+                    adapter: cache.adapter.array
