@@ -102,20 +102,25 @@ przeglądarka ──HTTPS──► Cloudflare ──► pośrednik Mikrusa ─�
 
 Aplikacja czyta `APP_SECRET`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_PASSWORD`, `ELASTICSEARCH_PASSWORD` i `MAILER_DSN` z Secretu `system-erp`. W repozytorium leży jego zaszyfrowana wersja, SealedSecret. Szyfruje się ją kluczem publicznym klastra, a odszyfrować może tylko kontroler Sealed Secrets w tym klastrze, kluczem prywatnym, który nigdy go nie opuszcza.
 
-Zmiana albo dodanie hasła (na serwerze). Generuje się od razu cały Secret, z wszystkimi kluczami:
+Zmiana albo dodanie hasła (na serwerze). Generuje się od razu cały Secret, z wszystkimi kluczami. Wartości, które mają zostać, są odczytywane z działającego klastra, więc nie trzeba ich przepisywać. Nowa wartość `APP_SECRET` wylogowałaby wszystkich, a nowe hasło bazy odcięłoby aplikację od bazy:
 
 ```bash
+# kubeseal, w przeciwieństwie do kubectl z k3s, sam nie znajdzie konfiguracji klastra;
+# przez "ssh serwer polecenie" ~/.bashrc nie jest wczytywany
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+get() { kubectl -n system-erp get secret system-erp -o jsonpath="{.data.$1}" | base64 -d; }
+
 kubectl create secret generic system-erp --namespace system-erp \
-  --from-literal=APP_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=POSTGRES_PASSWORD='<obecne hasło bazy>' \
-  --from-literal=REDIS_PASSWORD="$(openssl rand -hex 32)" \
-  --from-literal=RABBITMQ_PASSWORD='<obecne hasło RabbitMQ albo nowe przy pierwszym wdrożeniu>' \
-  --from-literal=ELASTICSEARCH_PASSWORD="$(openssl rand -hex 32)" \
+  --from-literal=APP_SECRET="$(get APP_SECRET)" \
+  --from-literal=POSTGRES_PASSWORD="$(get POSTGRES_PASSWORD)" \
+  --from-literal=REDIS_PASSWORD="$(get REDIS_PASSWORD)" \
+  --from-literal=RABBITMQ_PASSWORD="$(get RABBITMQ_PASSWORD)" \
+  --from-literal=ELASTICSEARCH_PASSWORD="$(get ELASTICSEARCH_PASSWORD)" \
   --from-literal=MAILER_DSN='smtp://…' \
   --dry-run=client -o yaml | kubeseal --format yaml > /root/system-erp-secret.yaml
 ```
 
-Potem plik trafia do `deploy/mikrus/system-erp-secret.yaml` przez commit. Jawne hasła nie lądują na dysku: `--dry-run` niczego nie tworzy, a `kubeseal` od razu szyfruje.
+Klucz, który ma dostać nową wartość, zamienia się na `"$(openssl rand -hex 32)"`, a nowy klucz dopisuje tak samo. Potem plik trafia do `deploy/mikrus/system-erp-secret.yaml` przez commit na `main`. Argo CD (aplikacja `mikrus`) aktualizuje Secret w ciągu kilku minut, a działające pody czytają go dopiero po restarcie. Jawne hasła nie lądują na dysku ani na ekranie: `--dry-run` niczego nie tworzy, a `kubeseal` od razu szyfruje.
 
 - **Hasło RabbitMQ działa tak samo**: broker zakłada użytkownika tylko przy pierwszym starcie. Obecne odczytasz tym samym poleceniem z kluczem `RABBITMQ_PASSWORD`. Hasła Redisa i Elasticsearch można zmieniać dowolnie, bo oba czytają je przy każdym starcie.
 - **Hasło bazy zostaw takie, jakie jest.** PostgreSQL ustawia je tylko przy pierwszym starcie z pustym dyskiem. Obecne odczytasz z klastra: `kubectl -n system-erp get secret system-erp -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d`.
