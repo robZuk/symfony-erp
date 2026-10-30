@@ -17,6 +17,11 @@ interface PartnerDirectory
     public function findMany(array $ids): array;
 
     /**
+     * An active customer with this NIP (digits only, separators are ignored), or null.
+     */
+    public function findCustomerByNip(string $nip): ?PartnerSummary;
+
+    /**
      * @return list<PartnerSummary> active customers ordered by name
      */
     public function customers(): array;

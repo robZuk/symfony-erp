@@ -3,11 +3,13 @@
 namespace App\Shared\Audit;
 
 /**
- * The signed-in person as the activity log sees them. Implemented by the user class of the Identity module.
+ * Whoever did something, as the activity log sees them: the signed-in person (the user class of the
+ * Identity module) or a system calling the REST API with its key.
  */
 interface Actor
 {
-    public function actorId(): int;
+    /** The user's id; null for a system, which is not a user. */
+    public function actorId(): ?int;
 
     public function actorName(): string;
 }

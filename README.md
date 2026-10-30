@@ -79,7 +79,7 @@ Wszystkie moduły mają ten sam układ katalogów:
 
 | Katalog | Zawartość |
 |---|---|
-| `Controller` | Cienkie kontrolery (`AbstractController`). Routing, uprawnienia i CSRF są atrybutami (`#[Route]`, `#[IsGranted]`, `#[IsCsrfTokenValid]`), a parametry list (filtry, strona) wiąże `#[MapQueryString]` z obiektem DTO. |
+| `Controller` | Cienkie kontrolery (`AbstractController`), w `Controller/Api` kontrolery REST API. Routing, uprawnienia i CSRF są atrybutami (`#[Route]`, `#[IsGranted]`, `#[IsCsrfTokenValid]`), a parametry list (filtry, strona) wiąże `#[MapQueryString]` z obiektem DTO. |
 | `Dto` | Filtry list (`OrderFilter`, `ProductFilter` …) i dane formularzy (`OrderDraft`, `IssueInvoice`, `DocumentHeader`) z walidacją `#[Assert\…]` |
 | `Entity` | Encje Doctrine z zachowaniem (np. `block()`, przejścia statusów), a nie tylko gettery i settery |
 | `Form` | Formularze Symfony Form dla ekranów edycji |
@@ -88,7 +88,8 @@ Wszystkie moduły mają ten sam układ katalogów:
 | `Twig` | Live Components i komponenty Twig należące do modułu |
 | `Message` | Wiadomości Messengera i ich handlery: PDF faktury (`Invoicing`), subskrybenci zdarzeń z RabbitMQ (`Catalog`, `Dashboard`) |
 | `Search` | Tylko `Catalog`: indeks i zapytania Elasticsearch |
-| `Command` | Polecenia konsoli (`app:user:create`, `app:search:reindex`) |
+| `Command` | Polecenia konsoli (`app:user:create`, `app:api-key:create`, `app:search:reindex`) |
+| `Api` | Zasoby REST API (`ProductResource`, `OrderResource` …): to, co widzi klient API, oddzielone od encji |
 
 Tabele mają prefiks modułu (`identity_user`, `inventory_stock_level`, `shared_document_sequence`), więc w bazie od razu widać, kto jest właścicielem danych. Schemat zmienia się wyłącznie migracjami Doctrine (`migrations/`).
 
@@ -238,6 +239,42 @@ Obok wyników są liczniki według rodzaju i stawki VAT (agregacje). Każdy licz
 
 Indeks ma `dynamic: strict`: pole, którego nie ma w `ProductIndex::definition()`, to błąd zapisu, a nie zgadywanie typu. Zapis pojedynczego produktu ma `require_alias`, więc Elasticsearch nie założy sam indeksu bez mapowania.
 
+### REST API dla innych systemów
+
+API pod `/api` służy systemom zewnętrznym, np. sklepowi internetowemu. **Dokumentacja OpenAPI z Swagger UI jest pod `/api/doc`.** Generuje ją NelmioApiDocBundle z kontrolerów i ich atrybutów, więc nie rozjeżdża się z kodem. Kontrolery API leżą w modułach, których dotyczą (`<Moduł>/Controller/Api`), i korzystają z tych samych serwisów co ekrany.
+
+| Endpoint | Zakres klucza | Co robi |
+|---|---|---|
+| `GET /api/products?q=` | `catalog:read` | produkty; wyszukiwanie jak na ekranie (Elasticsearch, a gdy nie działa, baza) |
+| `GET /api/products/{sku}` | `catalog:read` | jeden produkt |
+| `GET /api/stock?sku=A,B` | `stock:read` | stany w każdym magazynie i razem; nieznane indeksy w `unknown` |
+| `POST /api/orders` | `orders:write` | zamówienie od razu potwierdzone, z rezerwacją towaru; ceny i VAT z katalogu, nie od klienta |
+| `GET /api/orders/{id}` | `orders:read` | status zamówienia, tylko złożonego tym samym kluczem |
+
+**Klucze API.** Wbudowany w Symfony `access_token` na bezstanowym firewallu `api`, z nagłówkiem `Authorization: Bearer erp_…`. W bazie (`identity_api_key`) jest tylko skrót SHA-256 klucza, więc wyciek bazy nie daje działających kluczy. Klucz ma zakresy, które są jego rolami (`#[IsGranted('ROLE_API_ORDERS_WRITE')]`), i może zostać unieważniony. Zakłada się go poleceniem `app:api-key:create`, które pokazuje sekret jeden raz. Limit to 120 zapytań na minutę na klucz (okno przesuwne, liczniki w Redisie). Po jego przekroczeniu klient dostaje 429 z `Retry-After`, a każda odpowiedź podaje `X-RateLimit-Remaining`.
+
+**Idempotencja zamówień.** Gdy połączenie zerwie się przed odpowiedzią, sklep nie wie, czy zamówienie powstało, i ponawia żądanie. Każde `POST /api/orders` niesie więc nagłówek `Idempotency-Key`:
+
+- ten sam klucz i ta sama treść zwracają już złożone zamówienie (200, `Idempotent-Replayed: true`), a towar nie jest rezerwowany drugi raz,
+- ten sam klucz z inną treścią to błąd (422), a nie ciche zwrócenie cudzego zamówienia,
+- równoczesne żądania z jednym kluczem kolejkuje blokada (`symfony/lock`), a unikalny indeks (klient, klucz) w `sales_api_order_request` pilnuje tego w samej bazie,
+- odmowa (np. brak towaru) niczego nie zapisuje, także klucza, więc to samo żądanie może przejść później.
+
+**Błędy** mają jeden kształt, `application/problem+json` (RFC 9457), nadawany przez `Shared\Api\ProblemDetails`:
+
+| Status | Kiedy | Dodatkowo |
+|---|---|---|
+| 400 | brak `Idempotency-Key` | |
+| 401 | brak klucza albo zły klucz | nagłówek `WWW-Authenticate: Bearer` (RFC 6750) |
+| 403 | klucz bez potrzebnego zakresu | bez nazw ról w treści |
+| 404 | nie ma zasobu, także cudzego zamówienia | dzięki temu nie da się sprawdzić, że cudze zamówienie istnieje (OWASP API1, BOLA) |
+| 409 | za mało towaru | `shortages`: indeks, zamówiono, dostępne |
+| 422 | błędne dane, nieznany NIP, magazyn lub produkt | `violations`: pole i komunikat, wszystkie naraz |
+| 429 | przekroczony limit | `Retry-After` |
+| 500 | nieoczekiwany błąd | nigdy nie ujawnia szczegółów; te są w logu |
+
+Kwoty i ilości są w JSON-ie tekstami dziesiętnymi (`"34.90"`, `"2.5"`), a nie liczbami, bo klient czytający je jako `float` traciłby grosze.
+
 ### Redis: cache i sesje
 
 Wspólny stan wszystkich kopii aplikacji (dwa pody web i worker) jest w Redisie, a nie w tabelach PostgreSQL:
@@ -270,6 +307,7 @@ Statusy i dozwolone przejścia są konfiguracją (Symfony Workflow, `type: state
 - **Unieważnianie sesji.** `User` implementuje `EquatableInterface`. Po zmianie hasła, ról albo zablokowaniu konta użytkownik z otwartą sesją zostaje wylogowany przy następnym żądaniu.
 - **Ochrona logowania.** `login_throttling` (5 prób na 15 minut, osobny limit na adres IP), CSRF w formularzu logowania, przy wylogowaniu i przy każdej akcji zmieniającej dane.
 - **Podszywanie się** to standardowy `switch_user` firewalla, dostępny tylko dla `ROLE_ADMIN`.
+- **API**: klucze przechowywane jako skrót, zakresy uprawnień, limit zapytań na klucz, a każdy klient widzi tylko swoje zamówienia (szczegóły w sekcji REST API).
 
 ### Interfejs bez własnego JavaScriptu
 
@@ -293,6 +331,15 @@ make serve   # serwer; w tle przebudowuje CSS i obsługuje kolejki
 `make serve` uruchamia serwer na pierwszym wolnym porcie, zwykle http://127.0.0.1:8000. Adres pokaże też `symfony server:status`. Listę wszystkich poleceń wypisuje `make help`.
 
 Kontenery wystawiają porty losowo, więc nie gryzą się z innymi projektami. Symfony CLI sam je odczytuje i przekazuje aplikacji jako `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_DSN`, `ELASTICSEARCH_URL` i `MAILER_DSN`, dlatego polecenia konsoli uruchamia się przez `symfony console`, a nie przez `php bin/console`. Maile wysłane przez aplikację przechwytuje Mailpit. Jego panel jest dostępny z paska debugowania Symfony.
+
+### REST API lokalnie
+
+```bash
+symfony console app:api-key:create "Sklep testowy" --scope=catalog:read --scope=stock:read --scope=orders:read --scope=orders:write
+curl -H "Authorization: Bearer erp_…" "http://127.0.0.1:8000/api/products?q=kabel"
+```
+
+Swagger UI: http://127.0.0.1:8000/api/doc. Kliknij „Authorize”, wklej klucz i wywołuj endpointy z przeglądarki. Listę kluczy pokazuje `app:api-key:list`, a unieważnia je `app:api-key:revoke erp_xxxxxxxx`.
 
 ### Konta demo
 
@@ -419,7 +466,8 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 | Procesy biznesowe | Symfony Workflow | maszyna stanów zamówienia |
 | Zadania w tle | Symfony Messenger (transport Doctrine) | PDF faktur, maile, powiadomienia |
 | Zdarzenia | RabbitMQ 4, Symfony Messenger (transport AMQP), transactional outbox | zdarzenia biznesowe dla innych modułów i systemów |
-| Bezpieczeństwo | Symfony Security, Rate Limiter | logowanie formularzem, role, limit prób, podszywanie się |
+| Bezpieczeństwo | Symfony Security, Rate Limiter | logowanie formularzem, role, limit prób, podszywanie się, klucze API (`access_token`) |
+| REST API | Symfony Serializer, `#[MapRequestPayload]`, NelmioApiDocBundle (OpenAPI, Swagger UI) | API dla innych systemów, błędy RFC 9457 |
 | Walidacja i formularze | Symfony Validator, Form | formularze edycji, walidacja NIP (`App\Shared\Validator\Nip`) |
 | Interfejs | Twig, Symfony UX: Turbo, Stimulus, TwigComponent, Live Components, UX Icons | ekrany renderowane po stronie serwera |
 | Style | Tailwind CSS 4 (symfonycasts/tailwind-bundle), AssetMapper | CSS i JS bez Node |

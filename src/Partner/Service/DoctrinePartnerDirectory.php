@@ -6,6 +6,7 @@ use App\Partner\Entity\Partner;
 use App\Partner\Repository\PartnerRepository;
 use App\Shared\Partner\PartnerDirectory;
 use App\Shared\Partner\PartnerSummary;
+use App\Shared\Validator\NipValidator;
 
 final class DoctrinePartnerDirectory implements PartnerDirectory
 {
@@ -32,6 +33,13 @@ final class DoctrinePartnerDirectory implements PartnerDirectory
         }
 
         return $summaries;
+    }
+
+    public function findCustomerByNip(string $nip): ?PartnerSummary
+    {
+        $partner = $this->partners->findOneBy(['nip' => NipValidator::normalize($nip), 'active' => true, 'customer' => true]);
+
+        return null === $partner ? null : self::summarize($partner);
     }
 
     public function customers(): array
