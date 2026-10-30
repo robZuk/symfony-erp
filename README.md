@@ -299,6 +299,10 @@ Na stronie kontrahenta przycisk „Sprawdź w VIES” pyta unijny rejestr VIES (
 - **VAT-UE to nie czynny podatnik VAT**: firma może płacić VAT w Polsce i nie mieć VAT-UE. Komunikat mówi to wprost, zamiast sugerować, że firma nie istnieje.
 - **Testy bez sieci**: `tests/Support/FakeViesSoapClient` to prawdziwy klient z prawdziwym WSDL-em, któremu `__doRequest()` zwraca nagrane odpowiedzi SOAP. Testowane są więc też budowa żądania i odczyt odpowiedzi, a test widzi wysłany XML.
 
+### Wydajność i tryb worker FrankenPHP
+
+Aplikacja działa w **trybie worker FrankenPHP**: startuje raz i obsługuje kolejne żądania z pamięci, zamiast uruchamiać się od zera przy każdym. W teście obciążeniowym k6 (`tests/load/k6.js`) daje to 2× więcej żądań na sekundę, 0 błędów zamiast 13% i p95 zamówienia przez API 42 ms zamiast 976 ms. Serwisy z własnym stanem resetuje `ResetInterface` między żądaniami (`tests/Shared/LongRunningProcessTest`). Metodę, wszystkie wyniki i to, co nie zadziałało: [docs/wydajnosc.md](docs/wydajnosc.md).
+
 ### Redis: cache i sesje
 
 Wspólny stan wszystkich kopii aplikacji (dwa pody web i worker) jest w Redisie, a nie w tabelach PostgreSQL:

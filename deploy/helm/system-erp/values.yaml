@@ -30,6 +30,9 @@ storageClassName: ""
 web:
     # Two copies, so one keeps serving while the other is replaced during an update
     replicas: 2
+    # PHP workers per pod. Measured with k6 (docs/wydajnosc.md): 4 workers serve about 1000 requests a
+    # second at about 100 MB, within the memory limit below
+    phpWorkers: 4
     resources:
         requests:
             cpu: 50m

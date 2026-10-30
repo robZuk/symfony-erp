@@ -7,7 +7,12 @@ framework:
         # The "app" cache, which also holds the failed sign-in counts of login throttling,
         # is kept in Redis so that every running copy of the app shares it.
         # Redis drops expired entries itself, so no table fills up with them.
-        default_redis_provider: '%env(REDIS_URL)%'
+        # The connection is opened once per FrankenPHP worker and kept for the requests it serves. Without
+        # worker mode every request opened and closed its own: under load (about 550 requests a second,
+        # docs/wydajnosc.md) they piled up in TIME_WAIT and Redis reads failed. "persistent=1" did not
+        # help there: phpredis does not keep connections across requests in FrankenPHP's classic mode.
+        # The timeouts keep a stuck Redis from holding requests forever.
+        default_redis_provider: '%env(REDIS_URL)%?timeout=2&read_timeout=2'
         app: cache.adapter.redis_tag_aware
 
         pools:

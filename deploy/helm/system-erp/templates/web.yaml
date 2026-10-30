@@ -40,6 +40,10 @@ spec:
               containerPort: 8080
           env:
             {{- include "system-erp.appEnv" . | nindent 12 }}
+            # A fixed number of PHP workers, each a copy of the application in memory: FrankenPHP would
+            # otherwise start two per CPU core it sees, and in a container that is the whole node's
+            - name: FRANKENPHP_CONFIG
+              value: "worker ./public/index.php {{ .Values.web.phpWorkers }}"
           # The login page is public and touches PHP, Twig and the session table:
           # if it answers, the app works
           readinessProbe:

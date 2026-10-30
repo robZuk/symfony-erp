@@ -6,7 +6,8 @@ framework:
     # Sessions are kept in Redis, so every running copy of the app sees the same sign-ins.
     # Redis expires them by itself, at the lifetime set by session.gc_maxlifetime.
     session:
-        handler_id: '%env(REDIS_URL)%'
+        # With the same timeouts as the cache (config/packages/cache.yaml)
+        handler_id: '%env(REDIS_URL)%?timeout=2&read_timeout=2'
 
     #esi: true
     #fragments: true

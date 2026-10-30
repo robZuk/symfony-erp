@@ -5,7 +5,7 @@ framework:
         # shared by every web pod.
         api:
             policy: sliding_window
-            limit: 120
+            limit: '%env(int:API_RATE_LIMIT)%'
             interval: '1 minute'
 
 when@test:

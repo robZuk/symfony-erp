@@ -10,6 +10,7 @@ use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Psr\Clock\ClockInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Logs every creation, change and removal of an Audited entity, whoever makes it and wherever in the code.
@@ -20,7 +21,7 @@ use Psr\Clock\ClockInterface;
  */
 #[AsDoctrineListener(event: Events::onFlush)]
 #[AsDoctrineListener(event: Events::postFlush)]
-final class AuditListener
+final class AuditListener implements ResetInterface
 {
     /** @var list<array{action: string, verb: string, entity: Audited, details: string}> */
     private array $pending = [];
@@ -35,6 +36,10 @@ final class AuditListener
 
     public function onFlush(OnFlushEventArgs $event): void
     {
+        // Each flush reports its own changes only. A flush that failed after this point never reached
+        // postFlush; without this its changes would be logged by the next, unrelated flush of the
+        // same long-running process (a Messenger worker, the FrankenPHP worker)
+        $this->pending = [];
         $unitOfWork = $event->getObjectManager()->getUnitOfWork();
 
         foreach ($unitOfWork->getScheduledEntityInsertions() as $entity) {
@@ -64,6 +69,14 @@ final class AuditListener
                 $this->pending[] = ['action' => 'deleted', 'verb' => 'Usunięto', 'entity' => $entity, 'details' => ''];
             }
         }
+    }
+
+    /**
+     * Between two requests or two messages of a long-running process (kernel.reset).
+     */
+    public function reset(): void
+    {
+        $this->pending = [];
     }
 
     public function postFlush(PostFlushEventArgs $event): void
