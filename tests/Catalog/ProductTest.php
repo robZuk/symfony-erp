@@ -3,14 +3,19 @@
 namespace App\Tests\Catalog;
 
 use App\Catalog\Entity\Product;
+use App\Catalog\Entity\ProductKind;
 use App\Catalog\Repository\ProductRepository;
 use App\Identity\Entity\User;
+use App\Tests\Support\IndexesProducts;
 use App\Tests\Support\SignsIn;
+use Elastic\Elasticsearch\Client;
+use Elastic\Elasticsearch\ClientBuilder;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 final class ProductTest extends WebTestCase
 {
+    use IndexesProducts;
     use SignsIn;
 
     private KernelBrowser $client;
@@ -115,6 +120,7 @@ final class ProductTest extends WebTestCase
         $this->createProduct('KAB-1', 'Kabel HDMI');
         $this->createProduct('MYSZ-1', 'Mysz bezprzewodowa');
         $this->createProduct('HUB-KAB', 'Rozdzielacz USB');
+        $this->indexProducts();
         $this->signInAs($this->client);
 
         $this->client->request('GET', '/catalog/products?q=kab');
@@ -126,12 +132,66 @@ final class ProductTest extends WebTestCase
     public function testSearchTreatsWildcardsLiterally(): void
     {
         $this->createProduct('KAB-1', 'Kabel HDMI');
+        $this->indexProducts();
         $this->signInAs($this->client);
 
         $this->client->request('GET', '/catalog/products?q=%25');
 
         self::assertSelectorCount(0, '[data-test="product-row"]');
         self::assertSelectorTextContains('main', 'Brak produktów spełniających kryteria.');
+    }
+
+    public function testSearchForgivesTyposAndMissingPolishLetters(): void
+    {
+        $this->createProduct('ZAR-1', 'Żarówka LED E27');
+        $this->createProduct('KAB-1', 'Kabel HDMI 2 m');
+        $this->indexProducts();
+        $this->signInAs($this->client);
+
+        $this->client->request('GET', '/catalog/products?q=zarowka');
+        self::assertSelectorCount(1, '[data-test="product-row"]');
+        self::assertSelectorTextContains('[data-test="product-row"]', 'Żarówka LED E27');
+
+        $this->client->request('GET', '/catalog/products?q=kabl+hdmi');
+        self::assertSelectorCount(1, '[data-test="product-row"]');
+        self::assertSelectorTextContains('[data-test="product-row"]', 'Kabel HDMI 2 m');
+    }
+
+    public function testSearchCountsMatchesPerKindAndNarrowsByThem(): void
+    {
+        $this->createProduct('KAB-1', 'Kabel HDMI');
+        $this->createProduct('KAB-2', 'Kabel USB');
+        $this->createProduct('USL-KAB', 'Montaż kabli', ProductKind::Service);
+        $this->indexProducts();
+        $this->signInAs($this->client);
+
+        $this->client->request('GET', '/catalog/products?q=kab');
+        self::assertSelectorCount(3, '[data-test="product-row"]');
+        self::assertSelectorTextContains('[data-test="facet-kind-goods"]', '2');
+        self::assertSelectorTextContains('[data-test="facet-kind-service"]', '1');
+
+        $this->client->clickLink('Usługa');
+        self::assertSelectorCount(1, '[data-test="product-row"]');
+        self::assertSelectorTextContains('[data-test="product-row"]', 'Montaż kabli');
+        // The other kind is still counted, so the user can switch to it
+        self::assertSelectorTextContains('[data-test="facet-kind-goods"]', '2');
+    }
+
+    public function testListWorksWhenSearchIsDown(): void
+    {
+        $this->createProduct('KAB-1', 'Kabel HDMI');
+        $this->createProduct('MYSZ-1', 'Mysz bezprzewodowa');
+        $this->signInAs($this->client);
+        // Nothing listens on port 1: every request to Elasticsearch fails at once
+        $this->client->disableReboot();
+        self::getContainer()->set(Client::class, ClientBuilder::create()->setHosts(['http://127.0.0.1:1'])->setRetries(0)->build());
+
+        $this->client->request('GET', '/catalog/products?q=kab');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-test="search-unavailable"]');
+        self::assertSelectorCount(1, '[data-test="product-row"]');
+        self::assertSelectorTextContains('[data-test="product-row"]', 'Kabel HDMI');
     }
 
     public function testListIsPaginated(): void
@@ -207,11 +267,12 @@ final class ProductTest extends WebTestCase
         self::assertTrue($reloaded->isActive());
     }
 
-    private function createProduct(string $sku, string $name): Product
+    private function createProduct(string $sku, string $name, ProductKind $kind = ProductKind::Goods): Product
     {
         $product = new Product();
         $product->setSku($sku);
         $product->setName($name);
+        $product->setKind($kind);
         $product->setNetPrice(1000);
         self::getContainer()->get(ProductRepository::class)->save($product);
 

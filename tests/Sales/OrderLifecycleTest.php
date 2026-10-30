@@ -14,6 +14,7 @@ use App\Inventory\Repository\StockLevelRepository;
 use App\Partner\Entity\Partner;
 use App\Sales\Entity\OrderStatus;
 use App\Sales\Service\OrderLifecycle;
+use App\Shared\Event\IntegrationEvent;
 use App\Shared\Event\OrderCancelled;
 use App\Shared\Event\OrderConfirmed;
 use App\Shared\Event\OrderShipped;
@@ -256,14 +257,18 @@ final class OrderLifecycleTest extends KernelTestCase
     }
 
     /**
-     * @return list<object> messages queued in the outbox, in order
+     * @return list<IntegrationEvent> sales events queued in the outbox, in order; the products
+     *                                created by setUp() queue catalog events, which are not looked at here
      */
     private function outbox(): array
     {
         $transport = self::getContainer()->get('messenger.transport.outbox');
         self::assertInstanceOf(InMemoryTransport::class, $transport);
 
-        return array_map(static fn ($envelope): object => $envelope->getMessage(), array_values([...$transport->getSent()]));
+        return array_values(array_filter(
+            array_map(static fn ($envelope): object => $envelope->getMessage(), [...$transport->getSent()]),
+            static fn (object $message): bool => $message instanceof IntegrationEvent && str_starts_with($message::routingKey(), 'sales.'),
+        ));
     }
 
     /**

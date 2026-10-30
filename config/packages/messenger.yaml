@@ -35,6 +35,9 @@ framework:
                         # Dashboard figures computed from invoices (App\Dashboard\Message\ForgetDashboardFigures)
                         erp.dashboard:
                             binding_keys: ['invoicing.invoice.*']
+                        # Product search index (App\Catalog\Message\IndexProduct)
+                        erp.search:
+                            binding_keys: ['catalog.product.*']
                 retry_strategy:
                     max_retries: 3
                     multiplier: 2

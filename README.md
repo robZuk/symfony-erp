@@ -86,7 +86,9 @@ Wszystkie moduły mają ten sam układ katalogów:
 | `Repository` | Zapytania, wyszukiwanie ze stronicowaniem, blokady wierszy |
 | `Service` | Operacje biznesowe: jedna metoda to jedna transakcja (np. `OrderLifecycle::confirm()`, `InvoiceIssuing`, `StockPosting`) |
 | `Twig` | Live Components i komponenty Twig należące do modułu |
-| `Message` | Wiadomości Messengera i ich handlery (tylko `Invoicing`) |
+| `Message` | Wiadomości Messengera i ich handlery: PDF faktury (`Invoicing`), subskrybenci zdarzeń z RabbitMQ (`Catalog`, `Dashboard`) |
+| `Search` | Tylko `Catalog`: indeks i zapytania Elasticsearch |
+| `Command` | Polecenia konsoli (`app:user:create`, `app:search:reindex`) |
 
 Tabele mają prefiks modułu (`identity_user`, `inventory_stock_level`, `shared_document_sequence`), więc w bazie od razu widać, kto jest właścicielem danych. Schemat zmienia się wyłącznie migracjami Doctrine (`migrations/`).
 
@@ -213,6 +215,29 @@ flowchart LR
 
 Kolejki i wiadomości podgląda się w panelu RabbitMQ: lokalnie adres wypisuje `symfony var:export RABBITMQ_MANAGEMENT_URL` (login `guest`/`guest`), a w klastrze `kubectl -n system-erp exec system-erp-rabbitmq-0 -- rabbitmqctl list_queues`.
 
+### Wyszukiwarka produktów (Elasticsearch)
+
+Lista produktów bez wpisanej frazy pochodzi z PostgreSQL, więc produkt widać od razu po zapisaniu. Wyszukiwanie po słowach idzie przez Elasticsearch (`Catalog\Search\ProductSearch`), który znajduje to, czego `LIKE` nie znajdzie:
+
+| Wpisane | Znaleziony produkt | Dzięki czemu |
+|---|---|---|
+| `ladowarka` | Ładowarka sieciowa GaN 65 W | analizator z `asciifolding`: bez wielkich liter i polskich znaków |
+| `sluchawki blutooth` | Słuchawki nauszne Bluetooth | `fuzziness: AUTO`: jedna lub dwie literówki, zależnie od długości słowa |
+| `kab hd` | Kabel HDMI 2.1, 2 m | `edge_ngram`: początki słów, jeszcze w trakcie pisania |
+| `KAB-HDMI-2M` | ten produkt na pierwszym miejscu | dokładny indeks waży najwięcej (`boost`) |
+
+Obok wyników są liczniki według rodzaju i stawki VAT (agregacje). Każdy licznik uwzględnia drugi filtr, ale nie siebie (`post_filter`), więc po wybraniu „Usługa” nadal widać, ile jest towarów.
+
+**PostgreSQL jest źródłem prawdy, a Elasticsearch tylko indeksem.** Wyszukiwarka zwraca same identyfikatory w kolejności trafności, a produkty są ładowane z bazy. Gdy Elasticsearch nie odpowiada (2 s timeoutu, bez ponowień), `ProductFinder` loguje ostrzeżenie i szuka w bazie, a strona mówi, że wyniki są uproszczone.
+
+**Aktualizacja indeksu:**
+
+1. `ProductRepository::save()` w tej samej transakcji odkłada w outboxie `ProductChanged`. Zdarzenie przechodzi przez RabbitMQ do kolejki `erp.search`.
+2. `Catalog\Message\IndexProduct` czyta produkt z bazy i zapisuje go w indeksie. Zapisuje stan z bazy, a nie z treści zdarzenia, więc zdarzenie spóźnione, podwójne albo wyprzedzone przez nowsze niczego nie psuje. W indeksie produkt pojawia się po około sekundzie.
+3. `app:search:reindex` buduje cały indeks od nowa, obok obecnego (`products-20261030-101500-123`), i jednym atomowym `_aliases` przenosi na niego alias `products`, usuwając stary. Wyszukiwanie przez cały czas działa, a nieudana przebudowa niczego nie zmienia. Z `--if-missing` polecenie robi coś tylko wtedy, gdy indeksu nie ma (pierwsze wdrożenie). `make demo` uruchamia je po załadowaniu danych.
+
+Indeks ma `dynamic: strict`: pole, którego nie ma w `ProductIndex::definition()`, to błąd zapisu, a nie zgadywanie typu. Zapis pojedynczego produktu ma `require_alias`, więc Elasticsearch nie założy sam indeksu bez mapowania.
+
 ### Redis: cache i sesje
 
 Wspólny stan wszystkich kopii aplikacji (dwa pody web i worker) jest w Redisie, a nie w tabelach PostgreSQL:
@@ -259,15 +284,15 @@ Wymagania: PHP 8.5 z rozszerzeniami `redis` i `amqp` (Ubuntu: `sudo apt install 
 
 ```bash
 composer install
-make up      # Postgres, Redis, RabbitMQ i Mailpit w Dockerze
+make up      # Postgres, Redis, RabbitMQ, Elasticsearch i Mailpit w Dockerze
 make db      # baza i migracje
-make demo    # dane demonstracyjne (czyści bazę deweloperską!)
+make demo    # dane demonstracyjne i indeks wyszukiwarki (czyści bazę deweloperską!)
 make serve   # serwer; w tle przebudowuje CSS i obsługuje kolejki
 ```
 
 `make serve` uruchamia serwer na pierwszym wolnym porcie, zwykle http://127.0.0.1:8000. Adres pokaże też `symfony server:status`. Listę wszystkich poleceń wypisuje `make help`.
 
-Kontenery wystawiają porty losowo, więc nie gryzą się z innymi projektami. Symfony CLI sam je odczytuje i przekazuje aplikacji jako `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_DSN` i `MAILER_DSN`, dlatego polecenia konsoli uruchamia się przez `symfony console`, a nie przez `php bin/console`. Maile wysłane przez aplikację przechwytuje Mailpit. Jego panel jest dostępny z paska debugowania Symfony.
+Kontenery wystawiają porty losowo, więc nie gryzą się z innymi projektami. Symfony CLI sam je odczytuje i przekazuje aplikacji jako `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_DSN`, `ELASTICSEARCH_URL` i `MAILER_DSN`, dlatego polecenia konsoli uruchamia się przez `symfony console`, a nie przez `php bin/console`. Maile wysłane przez aplikację przechwytuje Mailpit. Jego panel jest dostępny z paska debugowania Symfony.
 
 ### Konta demo
 
@@ -380,7 +405,7 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 - **PHPStan** na poziomie 8 z rozszerzeniami `phpstan-symfony` (zna kontener i jego serwisy) i `phpstan-doctrine` (zna mapowanie encji).
 - **Deptrac** pilnuje granic modułów według `deptrac.yaml`.
 - **PHP-CS-Fixer** stosuje reguły `@Symfony`, a `lint:container`, `lint:twig` i `lint:yaml` walidują konfigurację i szablony.
-- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 jako usługę, instaluje PHP 8.5 (z `redis` i `amqp`) i uruchamia `make lint` oraz `make test`. Po udanych testach na `main` buduje obraz i publikuje go w GitHub Container Registry.
+- **GitHub Actions** przy każdym pushu do `main` i każdym pull requeście stawia PostgreSQL 16 i Elasticsearch 9 jako usługi, instaluje PHP 8.5 (z `redis` i `amqp`) i uruchamia `make lint` oraz `make test`. Po udanych testach na `main` buduje obraz i publikuje go w GitHub Container Registry.
 
 ## Technologie
 
@@ -389,6 +414,7 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 | Język i framework | PHP 8.5, Symfony 8.1 | całość; konfiguracja przez atrybuty, autowiring |
 | Baza danych | PostgreSQL 16, Doctrine ORM 3, Doctrine Migrations | dane, blokady wierszy, numeracja, kolejka i outbox |
 | Cache i sesje | Redis 8 | sesje, cache aplikacji, limit prób logowania, wyliczenia pulpitu |
+| Wyszukiwarka | Elasticsearch 9 (elasticsearch-php) | wyszukiwanie produktów: literówki, polskie znaki, prefiksy, liczniki filtrów |
 | Procesy biznesowe | Symfony Workflow | maszyna stanów zamówienia |
 | Zadania w tle | Symfony Messenger (transport Doctrine) | PDF faktur, maile, powiadomienia |
 | Zdarzenia | RabbitMQ 4, Symfony Messenger (transport AMQP), transactional outbox | zdarzenia biznesowe dla innych modułów i systemów |

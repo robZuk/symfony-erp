@@ -1,0 +1,20 @@
+# Product search (App\Catalog\Search). Elasticsearch is not the source of truth, PostgreSQL is:
+# when it cannot be reached, searching falls back to the database, so a request must give up quickly.
+framework:
+    http_client:
+        scoped_clients:
+            elasticsearch.http_client:
+                base_uri: '%env(ELASTICSEARCH_URL)%'
+                timeout: 2
+
+services:
+    # A library class built by its own factory, which an attribute in our code cannot express
+    Elastic\Elasticsearch\Client:
+        factory: ['Elastic\Elasticsearch\ClientBuilder', 'fromConfig']
+        arguments:
+            -   hosts: ['%env(ELASTICSEARCH_URL)%']
+                # Retrying another node makes no sense with a single one; the fallback is the retry
+                retries: 0
+                httpClient: !service
+                    class: Symfony\Component\HttpClient\Psr18Client
+                    arguments: ['@elasticsearch.http_client']

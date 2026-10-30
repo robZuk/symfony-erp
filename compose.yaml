@@ -36,7 +36,24 @@ services:
       retries: 10
       start_period: 30s
 
+  # Product search (index "products"); a single node without authentication, for development only
+  elasticsearch:
+    image: elasticsearch:9.4.6
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      # Without a limit the JVM would take half of the machine's memory
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s"]
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
 volumes:
 ###> doctrine/doctrine-bundle ###
   database_data:
 ###< doctrine/doctrine-bundle ###
+  elasticsearch_data:
