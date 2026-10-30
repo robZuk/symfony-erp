@@ -42,7 +42,7 @@ programista ── git push ──► GitHub (robZuk/symfony-erp)
 | Obiekt | Rodzaj | Rola |
 |---|---|---|
 | `system-erp-web` | Deployment, 2 pody | serwer WWW. Dwie kopie, więc aktualizacja odbywa się bez przerwy (nowy pod startuje, zanim stary zniknie) |
-| `system-erp-worker` | Deployment, 1 pod | `messenger:consume async outbox events`: PDF-y faktur i maile w tle, przekazywanie zdarzeń z outboxa do RabbitMQ i obsługa zdarzeń, które subskrybuje ERP. Co godzinę kończy się sam, a Kubernetes uruchamia nowy proces, co chroni przed wyciekami pamięci PHP |
+| `system-erp-worker` | Deployment, 1 pod | `messenger:consume --all --exclude-receivers=failed`: PDF-y faktur i maile w tle, przekazywanie zdarzeń z outboxa do RabbitMQ i obsługa zdarzeń, które subskrybuje ERP. Co godzinę kończy się sam, a Kubernetes uruchamia nowy proces, co chroni przed wyciekami pamięci PHP |
 | `system-erp-postgres` | StatefulSet | PostgreSQL 16 ze stałym dyskiem 5 GB |
 | `system-erp-redis` | StatefulSet | Redis 8 z hasłem: sesje i cache. Dysk 256 MB na zapis AOF, więc restart nie wylogowuje użytkowników |
 | `system-erp-rabbitmq` | StatefulSet | RabbitMQ 4 bez panelu (oszczędność pamięci): exchange `erp.events` i kolejki subskrybentów. Dysk 1 GB, więc oczekujące wiadomości przetrwają restart |

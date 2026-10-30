@@ -410,4 +410,4 @@ Blokady wierszy, numeracja i raport miesięczny korzystają ze składni PostgreS
 
 Świadomie poza zakresem: księgowość i rozrachunki, płatności, wycena magazynu, wydania częściowe, korekta ceny na fakturze, wiele walut i wiele firm, KSeF.
 
-Worker kolejek (`messenger:consume async outbox events`) lokalnie uruchamia `make serve`, a w Kubernetesie działa jako osobny Deployment (`deploy/helm/system-erp/templates/worker.yaml`).
+Worker kolejek (`messenger:consume --all --exclude-receivers=failed`) lokalnie uruchamia `make serve`, a w Kubernetesie działa jako osobny Deployment (`deploy/helm/system-erp/templates/worker.yaml`).

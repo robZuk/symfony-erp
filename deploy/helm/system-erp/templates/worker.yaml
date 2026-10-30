@@ -31,10 +31,13 @@ spec:
         - name: worker
           image: {{ include "system-erp.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Transports in order of priority: a waiting PDF goes before events.
+          # Every transport the image defines, in the order of config/packages/messenger.yaml (a waiting PDF
+          # goes before events), except "failed", whose messages are retried by hand. Not naming the transports
+          # keeps the command valid for any image: Argo CD applies a chart change at once, while the image
+          # tag changes only later, so a new chart may run for a while with the previous image.
           # The worker stops after an hour or above 128 MB on its own; Kubernetes starts a fresh one,
           # which keeps PHP memory leaks in check
-          command: ["php", "bin/console", "messenger:consume", "async", "outbox", "events", "--time-limit=3600", "--memory-limit=128M"]
+          command: ["php", "bin/console", "messenger:consume", "--all", "--exclude-receivers=failed", "--time-limit=3600", "--memory-limit=128M"]
           env:
             {{- include "system-erp.appEnv" . | nindent 12 }}
           resources:
