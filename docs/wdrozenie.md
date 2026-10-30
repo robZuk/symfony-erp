@@ -68,6 +68,20 @@ kubectl -n argocd describe application system-erp   # szczegóły i błędy osta
 kubectl -n system-erp get pods
 ```
 
+### Zmiany w kilku wydaniach
+
+Podczas wymiany podów przez chwilę działają obie wersje naraz, a migracje uruchamiają się, zanim powstanie pierwszy nowy pod. Do tego chart wdraża się od razu po pushu, a obraz dopiero po zmianie tagu, więc nowy chart przez kilka minut działa ze starym obrazem. Dlatego:
+
+- **Chart nie zakłada, która wersja obrazu działa.** Worker czyta `--all --exclude-receivers=failed` zamiast wymieniać transporty z nazwy, więc nie padnie na obrazie, który ich nie zna.
+- **Usuwanie (tabel, kolumn, transportów) idzie w osobnym, późniejszym wydaniu** niż kod, który przestaje z nich korzystać (expand/contract). Migracja usuwająca dane, których stara wersja jeszcze używa, psuje ją na czas wymiany podów.
+
+Przykład: przeniesienie sesji i cache do Redisa.
+
+1. Na serwerze nowy SealedSecret z `REDIS_PASSWORD` i `RABBITMQ_PASSWORD` (sekcja [Hasła](#hasła-sealed-secrets)). Bez niego pody nie wystartują.
+2. Merge gałęzi `feature/redis-rabbitmq`. Argo CD stawia Redisa i RabbitMQ, stary obraz dalej działa na tabelach `sessions` i `cache_items`.
+3. Zmiana `image.tag` na nowy obraz. Nowe pody korzystają z Redisa. Przy przejściu wszyscy zostają raz wylogowani, bo sesje z PostgreSQL nie są przenoszone.
+4. Dopiero gdy nie działa już żaden pod ze starym obrazem: merge gałęzi `feature/drop-session-tables`, której migracja usuwa obie tabele.
+
 ## Droga żądania
 
 ```
