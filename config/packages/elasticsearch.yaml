@@ -8,6 +8,11 @@ framework:
                 timeout: 2
 
 services:
+    # The scoped client above, as the PSR-18 client the Elasticsearch library expects
+    elasticsearch.psr18_client:
+        class: Symfony\Component\HttpClient\Psr18Client
+        arguments: ['@elasticsearch.http_client']
+
     # A library class built by its own factory, which an attribute in our code cannot express
     Elastic\Elasticsearch\Client:
         factory: ['Elastic\Elasticsearch\ClientBuilder', 'fromConfig']
@@ -17,6 +22,4 @@ services:
                 basicAuthentication: ['%env(ELASTICSEARCH_USERNAME)%', '%env(ELASTICSEARCH_PASSWORD)%']
                 # Retrying another node makes no sense with a single one; the fallback is the retry
                 retries: 0
-                httpClient: !service
-                    class: Symfony\Component\HttpClient\Psr18Client
-                    arguments: ['@elasticsearch.http_client']
+                httpClient: '@elasticsearch.psr18_client'
