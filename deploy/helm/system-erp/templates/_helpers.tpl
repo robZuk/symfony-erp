@@ -90,6 +90,30 @@ capabilities:
 Init container that keeps an app pod waiting until the database schema matches the code,
 so a new version never runs against tables the migration job has not created yet.
 */}}
+{{/*
+Init container that keeps an app pod waiting until Redis and RabbitMQ accept connections.
+Without it a pod started together with them (a fresh install, a restarted node) fails its first
+requests and is restarted a few times before they are up. Only the ports are checked, with the PHP
+of the app image, so it needs no password and works with any version of the image.
+*/}}
+{{- define "system-erp.waitForServices" -}}
+- name: wait-for-services
+  image: {{ include "system-erp.image" . }}
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  command:
+    - php
+    - -r
+    - |
+      foreach (['{{ include "system-erp.redisHost" . }}' => 6379, '{{ include "system-erp.rabbitmqHost" . }}' => 5672] as $host => $port) {
+          while (!@fsockopen($host, $port, $code, $error, 2)) {
+              echo "waiting for $host:$port\n";
+              sleep(3);
+          }
+      }
+  securityContext:
+    {{- include "system-erp.containerSecurity" . | nindent 4 }}
+{{- end }}
+
 {{- define "system-erp.waitForMigrations" -}}
 - name: wait-for-migrations
   image: {{ include "system-erp.image" . }}

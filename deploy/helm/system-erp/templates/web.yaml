@@ -29,6 +29,7 @@ spec:
         # Mounted disks become writable for the app user's group
         fsGroup: 1000
       initContainers:
+        {{- include "system-erp.waitForServices" . | nindent 8 }}
         {{- include "system-erp.waitForMigrations" . | nindent 8 }}
       containers:
         - name: web

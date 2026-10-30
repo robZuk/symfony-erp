@@ -26,6 +26,7 @@ spec:
       # Time to finish the message being handled after SIGTERM, before the pod is killed
       terminationGracePeriodSeconds: 60
       initContainers:
+        {{- include "system-erp.waitForServices" . | nindent 8 }}
         {{- include "system-erp.waitForMigrations" . | nindent 8 }}
       containers:
         - name: worker
