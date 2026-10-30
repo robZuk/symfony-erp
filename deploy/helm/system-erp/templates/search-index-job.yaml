@@ -1,3 +1,4 @@
+{{- if .Values.elasticsearch.enabled }}
 # Builds the product search index when Elasticsearch has none (the first deployment, or after its disk
 # was lost). On every later deployment it finds the index and does nothing; day-to-day changes reach the
 # index through ProductChanged events.
@@ -33,3 +34,4 @@ spec:
             {{- include "system-erp.appEnv" . | nindent 12 }}
           securityContext:
             {{- include "system-erp.containerSecurity" . | nindent 12 }}
+{{- end }}

@@ -90,6 +90,9 @@ rabbitmq:
             memory: 384Mi
 
 elasticsearch:
+    # Off where the server is too small for a JVM next to everything else; product search then
+    # falls back to PostgreSQL (App\Catalog\Search\ProductFinder)
+    enabled: true
     image: elasticsearch:9.4.6
     # JVM heap. A few thousand products need far less; the process as a whole takes about twice this
     heap: 256m

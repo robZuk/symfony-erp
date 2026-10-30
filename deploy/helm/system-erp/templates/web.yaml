@@ -46,11 +46,15 @@ spec:
               value: "worker ./public/index.php {{ .Values.web.phpWorkers }}"
           # The login page is public and touches PHP, Twig and the session table:
           # if it answers, the app works
+          # Generous timeouts: on the single CPU of the production server a busy moment (another pod
+          # starting) slows answers down for a while. The default timeout of 1 s then restarted both web
+          # pods at once and took the site down. Liveness is for a hung process, not a slow one.
           readinessProbe:
             httpGet:
               path: /login
               port: http
             periodSeconds: 5
+            timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
             httpGet:
@@ -58,7 +62,8 @@ spec:
               port: http
             initialDelaySeconds: 20
             periodSeconds: 20
-            failureThreshold: 3
+            timeoutSeconds: 10
+            failureThreshold: 6
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
           securityContext:

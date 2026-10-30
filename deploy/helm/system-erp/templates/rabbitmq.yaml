@@ -66,18 +66,21 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: RABBITMQ_PASSWORD
+          # The port, not rabbitmq-diagnostics: every diagnostics call starts an Erlang VM of its own,
+          # which on a single busy CPU took longer than the timeout and restarted the broker in a loop
           readinessProbe:
-            exec:
-              command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+            tcpSocket:
+              port: amqp
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            tcpSocket:
+              port: amqp
             initialDelaySeconds: 60
             periodSeconds: 30
-            timeoutSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             {{- toYaml .Values.rabbitmq.resources | nindent 12 }}
           volumeMounts:

@@ -1,3 +1,4 @@
+{{- if .Values.elasticsearch.enabled }}
 {{- $component := dict "component" "elasticsearch" "Release" .Release -}}
 # Product search: <release>-elasticsearch:9200. Not the source of truth: the app falls back to
 # PostgreSQL when it is down, and app:search:reindex rebuilds the index from the database.
@@ -108,3 +109,4 @@ spec:
         resources:
           requests:
             storage: {{ .Values.elasticsearch.size }}
+{{- end }}
