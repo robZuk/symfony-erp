@@ -11,7 +11,7 @@ programista ── git push ──► GitHub (robZuk/symfony-erp)
                                │                                                   │
                                ▼                                                   │ docker pull
                         Argo CD w klastrze ── co ok. 3 min porównuje ──► klaster k3s na serwerze Mikrus
-                        (GitOps)              repozytorium z klastrem     (web ×2, worker, PostgreSQL, Redis, RabbitMQ, backup)
+                        (GitOps)              repozytorium z klastrem     (web ×2, worker, PostgreSQL, Redis, RabbitMQ, Elasticsearch, backup)
 ```
 
 - **Kod i konfiguracja są w Gicie.** Na serwerze nie wdraża się niczego ręcznie (`kubectl apply`, `helm upgrade`). Wdrożenie to commit na `main`.
@@ -45,12 +45,14 @@ programista ── git push ──► GitHub (robZuk/symfony-erp)
 | `system-erp-worker` | Deployment, 1 pod | `messenger:consume --all --exclude-receivers=failed`: PDF-y faktur i maile w tle, przekazywanie zdarzeń z outboxa do RabbitMQ i obsługa zdarzeń, które subskrybuje ERP. Co godzinę kończy się sam, a Kubernetes uruchamia nowy proces, co chroni przed wyciekami pamięci PHP |
 | `system-erp-postgres` | StatefulSet | PostgreSQL 16 ze stałym dyskiem 5 GB |
 | `system-erp-redis` | StatefulSet | Redis 8 z hasłem: sesje i cache. Dysk 256 MB na zapis AOF, więc restart nie wylogowuje użytkowników |
+| `system-erp-elasticsearch` | StatefulSet | Elasticsearch 9 z hasłem, sterta 256 MB (cały proces około 600 MB): indeks wyszukiwarki produktów. `node.store.allow_mmap: false`, bo w nieuprzywilejowanym LXC nie da się podnieść `vm.max_map_count`. Dysk 1 GB, ale indeks zawsze da się odbudować z bazy |
+| `system-erp-search-index` | Job (PostSync) | `app:search:reindex --if-missing` po każdym wdrożeniu: buduje indeks, gdy go nie ma, a poza tym nic nie robi |
 | `system-erp-rabbitmq` | StatefulSet | RabbitMQ 4 bez panelu (oszczędność pamięci): exchange `erp.events` i kolejki subskrybentów. Dysk 1 GB, więc oczekujące wiadomości przetrwają restart |
 | `system-erp-migrations` | Job | `doctrine:migrations:migrate` przy każdym wdrożeniu. Pody aplikacji czekają na niego w init containerze |
 | `system-erp-backup` | CronJob | codziennie o 2:30 UTC zrzut bazy na osobny dysk. Zrzuty starsze niż 7 dni są usuwane |
 | `system-erp-invoices` | dysk (PVC) 1 GB | PDF-y faktur, wspólne dla podów web (pobieranie) i workera (generowanie) |
 
-Kolejność wdrażania ustalają adnotacje `argocd.argoproj.io/sync-wave`: najpierw baza, Redis i RabbitMQ, potem migracje, na końcu web i worker. Dyski z fakturami i backupami mają `Prune=false,Delete=false`, więc Argo CD nigdy ich nie usunie, nawet razem z aplikacją.
+Kolejność wdrażania ustalają adnotacje `argocd.argoproj.io/sync-wave`: najpierw baza, Redis, RabbitMQ i Elasticsearch, potem migracje, potem web i worker, a na końcu job indeksu wyszukiwarki. Dyski z fakturami i backupami mają `Prune=false,Delete=false`, więc Argo CD nigdy ich nie usunie, nawet razem z aplikacją.
 
 ## Nowa wersja aplikacji
 
@@ -77,7 +79,7 @@ Podczas wymiany podów przez chwilę działają obie wersje naraz, a migracje ur
 
 Przykład: przeniesienie sesji i cache do Redisa.
 
-1. Na serwerze nowy SealedSecret z `REDIS_PASSWORD` i `RABBITMQ_PASSWORD` (sekcja [Hasła](#hasła-sealed-secrets)). Bez niego pody nie wystartują.
+1. Na serwerze nowy SealedSecret z `REDIS_PASSWORD`, `RABBITMQ_PASSWORD` i `ELASTICSEARCH_PASSWORD` (sekcja [Hasła](#hasła-sealed-secrets)). Bez niego pody nie wystartują.
 2. Merge gałęzi `feature/redis-rabbitmq`. Argo CD stawia Redisa i RabbitMQ, stary obraz dalej działa na tabelach `sessions` i `cache_items`.
 3. Zmiana `image.tag` na nowy obraz. Nowe pody korzystają z Redisa. Przy przejściu wszyscy zostają raz wylogowani, bo sesje z PostgreSQL nie są przenoszone.
 4. Dopiero gdy nie działa już żaden pod ze starym obrazem: merge gałęzi `feature/drop-session-tables`, której migracja usuwa obie tabele.
@@ -98,7 +100,7 @@ przeglądarka ──HTTPS──► Cloudflare ──► pośrednik Mikrusa ─�
 
 ## Hasła (Sealed Secrets)
 
-Aplikacja czyta `APP_SECRET`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_PASSWORD` i `MAILER_DSN` z Secretu `system-erp`. W repozytorium leży jego zaszyfrowana wersja, SealedSecret. Szyfruje się ją kluczem publicznym klastra, a odszyfrować może tylko kontroler Sealed Secrets w tym klastrze, kluczem prywatnym, który nigdy go nie opuszcza.
+Aplikacja czyta `APP_SECRET`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_PASSWORD`, `ELASTICSEARCH_PASSWORD` i `MAILER_DSN` z Secretu `system-erp`. W repozytorium leży jego zaszyfrowana wersja, SealedSecret. Szyfruje się ją kluczem publicznym klastra, a odszyfrować może tylko kontroler Sealed Secrets w tym klastrze, kluczem prywatnym, który nigdy go nie opuszcza.
 
 Zmiana albo dodanie hasła (na serwerze). Generuje się od razu cały Secret, z wszystkimi kluczami:
 
@@ -108,13 +110,14 @@ kubectl create secret generic system-erp --namespace system-erp \
   --from-literal=POSTGRES_PASSWORD='<obecne hasło bazy>' \
   --from-literal=REDIS_PASSWORD="$(openssl rand -hex 32)" \
   --from-literal=RABBITMQ_PASSWORD='<obecne hasło RabbitMQ albo nowe przy pierwszym wdrożeniu>' \
+  --from-literal=ELASTICSEARCH_PASSWORD="$(openssl rand -hex 32)" \
   --from-literal=MAILER_DSN='smtp://…' \
   --dry-run=client -o yaml | kubeseal --format yaml > /root/system-erp-secret.yaml
 ```
 
 Potem plik trafia do `deploy/mikrus/system-erp-secret.yaml` przez commit. Jawne hasła nie lądują na dysku: `--dry-run` niczego nie tworzy, a `kubeseal` od razu szyfruje.
 
-- **Hasło RabbitMQ działa tak samo**: broker zakłada użytkownika tylko przy pierwszym starcie. Obecne odczytasz tym samym poleceniem z kluczem `RABBITMQ_PASSWORD`. Hasło Redisa można zmieniać dowolnie, bo Redis czyta je przy każdym starcie.
+- **Hasło RabbitMQ działa tak samo**: broker zakłada użytkownika tylko przy pierwszym starcie. Obecne odczytasz tym samym poleceniem z kluczem `RABBITMQ_PASSWORD`. Hasła Redisa i Elasticsearch można zmieniać dowolnie, bo oba czytają je przy każdym starcie.
 - **Hasło bazy zostaw takie, jakie jest.** PostgreSQL ustawia je tylko przy pierwszym starcie z pustym dyskiem. Obecne odczytasz z klastra: `kubectl -n system-erp get secret system-erp -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d`.
 - Hasła mają być szesnastkowe (`openssl rand -hex`), bo trafiają do adresów `DATABASE_URL` i `LOCK_DSN`, w których znaki `@ / : #` mają specjalne znaczenie.
 - **Kopia klucza prywatnego** jest w KeePassXC. Bez niej po utracie serwera nie da się odszyfrować sekretów z repozytorium. Kontroler co 30 dni dodaje nowy klucz, więc kopię trzeba odświeżać:

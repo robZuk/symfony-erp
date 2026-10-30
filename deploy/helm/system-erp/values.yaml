@@ -16,7 +16,7 @@ ingress:
     # Extra annotations for the Ingress, e.g. Traefik middlewares an environment needs
     annotations: {}
 
-# Secret with APP_SECRET, POSTGRES_PASSWORD, REDIS_PASSWORD, RABBITMQ_PASSWORD and MAILER_DSN. It is not created by this chart,
+# Secret with APP_SECRET, POSTGRES_PASSWORD, REDIS_PASSWORD, RABBITMQ_PASSWORD, ELASTICSEARCH_PASSWORD and MAILER_DSN. It is not created by this chart,
 # so no password ever lands in values files: locally it is made with kubectl, in production
 # it comes from a SealedSecret.
 existingSecret: system-erp
@@ -85,6 +85,18 @@ rabbitmq:
             memory: 160Mi
         limits:
             memory: 384Mi
+
+elasticsearch:
+    image: elasticsearch:9.4.6
+    # JVM heap. A few thousand products need far less; the process as a whole takes about twice this
+    heap: 256m
+    size: 1Gi
+    resources:
+        requests:
+            cpu: 100m
+            memory: 512Mi
+        limits:
+            memory: 768Mi
 
 backup:
     enabled: true

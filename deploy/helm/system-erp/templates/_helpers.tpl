@@ -29,6 +29,10 @@ app.kubernetes.io/component: {{ .component }}
 {{ .Release.Name }}-rabbitmq
 {{- end }}
 
+{{- define "system-erp.elasticsearchHost" -}}
+{{ .Release.Name }}-elasticsearch
+{{- end }}
+
 {{/*
 Environment of every container running the Symfony app (web, worker, migrations).
 Passwords come from the Secret; $(POSTGRES_PASSWORD) and the others are expanded by Kubernetes from the variables defined before them.
@@ -67,6 +71,15 @@ Passwords come from the Secret; $(POSTGRES_PASSWORD) and the others are expanded
       key: RABBITMQ_PASSWORD
 - name: RABBITMQ_DSN
   value: "amqp://{{ .Values.rabbitmq.user }}:$(RABBITMQ_PASSWORD)@{{ include "system-erp.rabbitmqHost" . }}:5672"
+- name: ELASTICSEARCH_URL
+  value: "http://{{ include "system-erp.elasticsearchHost" . }}:9200"
+- name: ELASTICSEARCH_USERNAME
+  value: elastic
+- name: ELASTICSEARCH_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret }}
+      key: ELASTICSEARCH_PASSWORD
 - name: LOCK_DSN
   value: "postgresql+advisory://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "system-erp.postgresHost" . }}:5432/{{ .Values.postgres.database }}"
 - name: DEFAULT_URI
@@ -109,6 +122,27 @@ of the app image, so it needs no password and works with any version of the imag
               echo "waiting for $host:$port\n";
               sleep(3);
           }
+      }
+  securityContext:
+    {{- include "system-erp.containerSecurity" . | nindent 4 }}
+{{- end }}
+
+{{/*
+Init container of the search index job: Elasticsearch takes up to a minute to start, and building
+the index before it answers would only fail. The web pods do not wait for it: search falls back
+to the database meanwhile.
+*/}}
+{{- define "system-erp.waitForElasticsearch" -}}
+- name: wait-for-elasticsearch
+  image: {{ include "system-erp.image" . }}
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  command:
+    - php
+    - -r
+    - |
+      while (!@fsockopen('{{ include "system-erp.elasticsearchHost" . }}', 9200, $code, $error, 2)) {
+          echo "waiting for {{ include "system-erp.elasticsearchHost" . }}:9200\n";
+          sleep(3);
       }
   securityContext:
     {{- include "system-erp.containerSecurity" . | nindent 4 }}

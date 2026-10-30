@@ -13,6 +13,8 @@ services:
         factory: ['Elastic\Elasticsearch\ClientBuilder', 'fromConfig']
         arguments:
             -   hosts: ['%env(ELASTICSEARCH_URL)%']
+                # Sent only when the password is not empty: none locally, the "elastic" user in the cluster
+                basicAuthentication: ['%env(ELASTICSEARCH_USERNAME)%', '%env(ELASTICSEARCH_PASSWORD)%']
                 # Retrying another node makes no sense with a single one; the fallback is the retry
                 retries: 0
                 httpClient: !service

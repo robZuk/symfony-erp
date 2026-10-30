@@ -1,0 +1,110 @@
+{{- $component := dict "component" "elasticsearch" "Release" .Release -}}
+# Product search: <release>-elasticsearch:9200. Not the source of truth: the app falls back to
+# PostgreSQL when it is down, and app:search:reindex rebuilds the index from the database.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "system-erp.elasticsearchHost" . }}
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
+spec:
+  selector:
+    {{- include "system-erp.selector" $component | nindent 4 }}
+  ports:
+    - name: http
+      port: 9200
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-elasticsearch
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  serviceName: {{ include "system-erp.elasticsearchHost" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "system-erp.selector" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "system-erp.selector" $component | nindent 8 }}
+    spec:
+      securityContext:
+        # The elasticsearch image runs as user 1000, group 0; the disk is made writable for that group
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: elasticsearch
+          image: {{ .Values.elasticsearch.image }}
+          ports:
+            - name: http
+              containerPort: 9200
+          env:
+            # One node: no cluster to form, and no replicas to place
+            - name: discovery.type
+              value: single-node
+            # Reading the index without memory-mapped files. With them Elasticsearch needs
+            # vm.max_map_count raised on the host, which an unprivileged LXC container (the
+            # production server) cannot do; with a small index the difference does not show.
+            - name: node.store.allow_mmap
+              value: "false"
+            # Disk thresholds in bytes instead of the default 85/90/95 % of the whole disk. The disk is
+            # shared with other applications and the index is small and can be rebuilt from the database;
+            # past the high threshold Elasticsearch stops allocating indices, its own user store included,
+            # and then cannot even check the password.
+            - name: cluster.routing.allocation.disk.watermark.low
+              value: 2gb
+            - name: cluster.routing.allocation.disk.watermark.high
+              value: 1gb
+            - name: cluster.routing.allocation.disk.watermark.flood_stage
+              value: 500mb
+            - name: ES_JAVA_OPTS
+              value: "-Xms{{ .Values.elasticsearch.heap }} -Xmx{{ .Values.elasticsearch.heap }}"
+            # Only the app talks to it, inside the cluster: a password, but no TLS
+            - name: xpack.security.enabled
+              value: "true"
+            - name: xpack.security.http.ssl.enabled
+              value: "false"
+            - name: xpack.security.transport.ssl.enabled
+              value: "false"
+            # Password of the built-in "elastic" user
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: ELASTICSEARCH_PASSWORD
+          # Ready = answers with the index at least yellow; until then the Service sends it no traffic
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "curl -fs -u \"elastic:$ELASTIC_PASSWORD\" 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s'"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.elasticsearch.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.elasticsearch.size }}

@@ -333,6 +333,7 @@ kubectl -n system-erp create secret generic system-erp \
   --from-literal=POSTGRES_PASSWORD=$(openssl rand -hex 16) \
   --from-literal=REDIS_PASSWORD=$(openssl rand -hex 16) \
   --from-literal=RABBITMQ_PASSWORD=$(openssl rand -hex 16) \
+  --from-literal=ELASTICSEARCH_PASSWORD=$(openssl rand -hex 16) \
   --from-literal=MAILER_DSN=null://null
 
 helm upgrade --install system-erp deploy/helm/system-erp \
