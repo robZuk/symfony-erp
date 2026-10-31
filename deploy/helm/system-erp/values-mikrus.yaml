@@ -2,7 +2,7 @@
 # The Secret named in existingSecret comes from deploy/mikrus/system-erp-secret.yaml (a SealedSecret).
 image:
     # The image CI built from this commit; a fixed tag, so the cluster runs a known version
-    tag: c392dd8
+    tag: 1224051
     pullPolicy: IfNotPresent
 
 host: systemerp.tojest.dev
