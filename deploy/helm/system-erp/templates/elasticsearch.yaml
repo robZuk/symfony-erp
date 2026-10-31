@@ -81,6 +81,14 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
                   key: ELASTICSEARCH_PASSWORD
+          # A JVM on one shared CPU takes minutes to start. Until the port opens the other probes do not
+          # run, so a slow start is not mistaken for a hung process and restarted in a loop (up to 10 min)
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
           # Ready = answers with the index at least yellow; until then the Service sends it no traffic
           readinessProbe:
             exec:
@@ -91,8 +99,9 @@ spec:
           livenessProbe:
             tcpSocket:
               port: http
-            initialDelaySeconds: 90
             periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             {{- toYaml .Values.elasticsearch.resources | nindent 12 }}
           volumeMounts:
