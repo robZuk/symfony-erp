@@ -230,7 +230,7 @@ Lista produktów bez wpisanej frazy pochodzi z PostgreSQL, więc produkt widać 
 
 Obok wyników są liczniki według rodzaju i stawki VAT (agregacje). Każdy licznik uwzględnia drugi filtr, ale nie siebie (`post_filter`), więc po wybraniu „Usługa” nadal widać, ile jest towarów.
 
-**PostgreSQL jest źródłem prawdy, a Elasticsearch tylko indeksem.** Wyszukiwarka zwraca same identyfikatory w kolejności trafności, a produkty są ładowane z bazy. Gdy Elasticsearch nie odpowiada (2 s timeoutu, bez ponowień), `ProductFinder` loguje ostrzeżenie i szuka w bazie, a strona mówi, że wyniki są uproszczone.
+**PostgreSQL jest źródłem prawdy, a Elasticsearch tylko indeksem.** Wyszukiwarka zwraca same identyfikatory w kolejności trafności, a produkty są ładowane z bazy. Gdy Elasticsearch nie odpowiada (2 s timeoutu, bez ponowień), `ProductFinder` loguje ostrzeżenie i szuka w bazie, a strona mówi, że wyniki są uproszczone. Tam, gdzie Elasticsearch jest celowo wyłączony (`ELASTICSEARCH_ENABLED=0`, dziś na produkcji), wyszukiwanie od razu idzie do bazy, bez ostrzeżeń.
 
 **Aktualizacja indeksu:**
 
