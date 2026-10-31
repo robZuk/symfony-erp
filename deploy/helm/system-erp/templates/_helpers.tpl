@@ -71,6 +71,8 @@ Passwords come from the Secret; $(POSTGRES_PASSWORD) and the others are expanded
       key: RABBITMQ_PASSWORD
 - name: RABBITMQ_DSN
   value: "amqp://{{ .Values.rabbitmq.user }}:$(RABBITMQ_PASSWORD)@{{ include "system-erp.rabbitmqHost" . }}:5672"
+- name: ELASTICSEARCH_ENABLED
+  value: {{ ternary "1" "0" .Values.elasticsearch.enabled | quote }}
 - name: ELASTICSEARCH_URL
   value: "http://{{ include "system-erp.elasticsearchHost" . }}:9200"
 - name: ELASTICSEARCH_USERNAME

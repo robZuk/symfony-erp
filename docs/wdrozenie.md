@@ -84,6 +84,14 @@ Przykład: przeniesienie sesji i cache do Redisa.
 3. Zmiana `image.tag` na nowy obraz. Nowe pody korzystają z Redisa. Przy przejściu wszyscy zostają raz wylogowani, bo sesje z PostgreSQL nie są przenoszone.
 4. Dopiero gdy nie działa już żaden pod ze starym obrazem: merge gałęzi `feature/drop-session-tables`, której migracja usuwa obie tabele. Razem z nią znika `schema_filter` w `config/packages/doctrine.yaml`, który do tego czasu ukrywa obie tabele przed `make:migration`, żeby żadna inna migracja nie usunęła ich za wcześnie.
 
+### Jeden rdzeń: incydent z 30 października 2026
+
+Pierwsze wdrożenie Elasticsearch na tym serwerze spowodowało kilkuminutową niedostępność strony (ok. 14:34–14:39). JVM na jednym, dzielonym rdzeniu startowała dłużej, niż pozwalała sonda żywotności (90 s), więc Elasticsearch restartował się w pętli i zajmował procesor. Obciążenie doszło do 10,5. Pody web nie mieściły się w domyślnym 1-sekundowym limicie sondy i zrestartowały się oba naraz, a RabbitMQ padał, bo jego sondy uruchamiały osobną maszynę wirtualną Erlanga. Test na k3d tego nie wykrył, bo klaster miał 12 rdzeni.
+
+- Elasticsearch jest na produkcji wyłączony (`elasticsearch.enabled: false`). Wyszukiwanie korzysta z PostgreSQL, a `IndexProduct` pomija zdarzenia.
+- Sondy web mają dłuższe limity, a RabbitMQ sprawdza się przez port.
+- Przy zmianach na tym serwerze trzeba liczyć CPU, nie tylko pamięć, a chart testować na k3d z limitem jednego rdzenia.
+
 ## Droga żądania
 
 ```
