@@ -135,6 +135,53 @@ final class ProductTest extends WebTestCase
         self::assertSelectorTextContains('main', 'Brak produktów spełniających kryteria.');
     }
 
+    public function testSearchForgivesTyposAndMissingPolishLetters(): void
+    {
+        $this->createProduct('ZAR-1', 'Żarówka LED E27');
+        $this->createProduct('KAB-1', 'Kabel HDMI 2 m');
+        $this->createProduct('LAD-1', 'Ładowarka sieciowa');
+        $this->createProduct('SLU-1', 'Słuchawki nauszne Bluetooth');
+        $this->signInAs($this->client);
+
+        foreach ([
+            'zarowka' => 'Żarówka LED E27',
+            'ŻARÓWKA' => 'Żarówka LED E27',
+            'kabl hdmi' => 'Kabel HDMI 2 m',
+            'kab hd' => 'Kabel HDMI 2 m',
+            'ladowarka' => 'Ładowarka sieciowa',
+            'sluchawki blutooth' => 'Słuchawki nauszne Bluetooth',
+        ] as $phrase => $name) {
+            $this->client->request('GET', '/catalog/products', ['q' => $phrase]);
+            self::assertSelectorCount(1, '[data-test="product-row"]', $phrase);
+            self::assertSelectorTextContains('[data-test="product-row"]', $name);
+        }
+    }
+
+    public function testSearchRequiresEveryWordAndIgnoresUnrelatedOnes(): void
+    {
+        $this->createProduct('KAB-1', 'Kabel HDMI');
+        $this->createProduct('KAB-2', 'Kabel USB');
+        $this->signInAs($this->client);
+
+        $this->client->request('GET', '/catalog/products', ['q' => 'kabel usb']);
+        self::assertSelectorCount(1, '[data-test="product-row"]');
+
+        $this->client->request('GET', '/catalog/products', ['q' => 'drukarka']);
+        self::assertSelectorCount(0, '[data-test="product-row"]');
+    }
+
+    public function testExactSkuComesFirst(): void
+    {
+        $this->createProduct('AAA-1', 'Adapter do KAB-HDMI-2M');
+        $this->createProduct('KAB-HDMI-2M', 'Zwykły kabel');
+        $this->signInAs($this->client);
+
+        $this->client->request('GET', '/catalog/products', ['q' => 'kab-hdmi-2m']);
+
+        self::assertSelectorCount(2, '[data-test="product-row"]');
+        self::assertSelectorTextContains('[data-test="product-row"]', 'Zwykły kabel');
+    }
+
     public function testListIsPaginated(): void
     {
         for ($i = 1; $i <= 25; ++$i) {

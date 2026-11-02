@@ -19,6 +19,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 class ProductRepository extends ServiceEntityRepository
 {
+    private const int MIN_FUZZY_WORD_LENGTH = 4;
+    private const float FUZZY_THRESHOLD = 0.5;
+
     public function __construct(
         ManagerRegistry $registry,
         private readonly Transactional $transactional,
@@ -62,19 +65,41 @@ class ProductRepository extends ServiceEntityRepository
     }
 
     /**
-     * The product list, sorted by name; words narrow it to a fragment of the name or the SKU.
+     * The product list. Without words it is sorted by name; with words the best matches come first,
+     * an exact SKU before everything else. Every word must match: as a fragment of the name or SKU,
+     * regardless of case and Polish letters, or, from 4 letters on, as a close match despite a typo.
      *
      * @return Page<Product>
      */
     public function search(ProductFilter $filter): Page
     {
-        $queryBuilder = $this->createQueryBuilder('p')->orderBy('p.name', 'ASC')->addOrderBy('p.id', 'ASC');
+        $queryBuilder = $this->createQueryBuilder('p');
+        $words = preg_split('/\s+/u', trim($filter->q), flags: \PREG_SPLIT_NO_EMPTY) ?: [];
 
-        if ('' !== trim($filter->q)) {
+        if ([] !== $words) {
+            $document = "SEARCH_NORMALIZE(CONCAT(p.name, ' ', p.sku))";
+
+            foreach ($words as $index => $word) {
+                $match = \sprintf('%s LIKE SEARCH_NORMALIZE(:pattern%d)', $document, $index);
+                $queryBuilder->setParameter('pattern'.$index, Paginator::containsPattern($word));
+
+                if (mb_strlen($word) >= self::MIN_FUZZY_WORD_LENGTH) {
+                    $match .= \sprintf(' OR WORD_SIMILARITY(SEARCH_NORMALIZE(:word%1$d), %2$s) >= :threshold', $index, $document);
+                    $queryBuilder->setParameter('word'.$index, $word)->setParameter('threshold', self::FUZZY_THRESHOLD);
+                }
+
+                $queryBuilder->andWhere($match);
+            }
+
             $queryBuilder
-                ->andWhere('LOWER(p.name) LIKE :term OR LOWER(p.sku) LIKE :term')
-                ->setParameter('term', Paginator::containsPattern($filter->q));
+                ->addSelect('CASE WHEN SEARCH_NORMALIZE(p.sku) = SEARCH_NORMALIZE(:phrase) THEN 1 ELSE 0 END AS HIDDEN exactSku')
+                ->addSelect(\sprintf('WORD_SIMILARITY(SEARCH_NORMALIZE(:phrase), %s) AS HIDDEN relevance', $document))
+                ->setParameter('phrase', trim($filter->q))
+                ->addOrderBy('exactSku', 'DESC')
+                ->addOrderBy('relevance', 'DESC');
         }
+
+        $queryBuilder->addOrderBy('p.name', 'ASC')->addOrderBy('p.id', 'ASC');
 
         $this->applyFilters($queryBuilder, $filter);
 

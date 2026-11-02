@@ -14,6 +14,11 @@ doctrine:
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         auto_mapping: true
+        dql:
+            string_functions:
+                SEARCH_NORMALIZE: App\Catalog\Doctrine\SearchNormalize
+            numeric_functions:
+                WORD_SIMILARITY: App\Catalog\Doctrine\WordSimilarity
         # One mapping per module: entities live in src/<Module>/Entity
         mappings:
             Shared:

@@ -218,7 +218,15 @@ Kolejki i wiadomości podgląda się w panelu RabbitMQ: lokalnie adres wypisuje 
 
 ### Wyszukiwanie produktów
 
-Lista i wyszukiwanie produktów korzystają z PostgreSQL (`ProductRepository::search()`). Fraza to fragment nazwy lub indeksu, bez względu na wielkość liter, a znaki `%` i `_` są traktowane dosłownie. Literówki ani pominięte polskie znaki nie są tolerowane.
+Lista i wyszukiwanie produktów korzystają z PostgreSQL (`ProductRepository::search()`), bez osobnej wyszukiwarki. Po wpisaniu frazy muszą pasować wszystkie jej słowa, a najlepsze trafienia są na górze. Dokładny indeks jest zawsze pierwszy.
+
+| Wpisane | Znaleziony produkt | Dzięki czemu |
+|---|---|---|
+| `ladowarka` | Ładowarka sieciowa GaN 65 W | `unaccent`: bez wielkich liter i polskich znaków |
+| `sluchawki blutooth` | Słuchawki nauszne Bluetooth | `pg_trgm`: podobieństwo słów od 4 liter (`word_similarity` ≥ 0,5) |
+| `kab hd` | Kabel HDMI 2.1, 2 m | fragment nazwy lub indeksu |
+
+Dopasowanie fragmentu korzysta z indeksu GIN na `search_normalize(name || ' ' || sku)`, a `word_similarity` przegląda wiersze po filtrach. Przy kilku tysiącach produktów nie ma to znaczenia, ale przy znacznie większym katalogu trzeba by to zmierzyć. Znaki `%` i `_` są traktowane dosłownie.
 
 ### REST API dla innych systemów
 

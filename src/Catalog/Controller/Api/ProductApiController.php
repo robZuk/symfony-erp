@@ -24,7 +24,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ProductApiController extends ApiController
 {
     #[Route('', name: 'index', methods: ['GET'])]
-    #[OA\Get(summary: 'Lista produktów, z wyszukiwaniem po nazwie lub indeksie', description: 'Domyślnie tylko aktywne. Fraza w `q` to fragment nazwy lub indeksu, bez względu na wielkość liter. Stronami po 20.')]
+    #[OA\Get(summary: 'Lista produktów, z wyszukiwaniem po nazwie lub indeksie', description: 'Domyślnie tylko aktywne. Fraza w `q` wybacza literówki i pominięte polskie znaki, a najlepsze trafienia są pierwsze. Stronami po 20.')]
     #[OA\Response(response: 200, description: 'Jedna strona produktów', content: new OA\JsonContent(properties: [
         new OA\Property(property: 'items', type: 'array', items: new OA\Items(ref: new Model(type: ProductResource::class))),
         new OA\Property(property: 'page', type: 'integer', example: 1),

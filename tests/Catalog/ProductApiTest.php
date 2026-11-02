@@ -27,7 +27,7 @@ final class ProductApiTest extends WebTestCase
         $this->createProduct('KAB-1', 'Kabel HDMI', netPrice: 3490);
         $this->createProduct('ZAR-1', 'Żarówka LED');
 
-        $page = $this->api($this->client, 'GET', '/api/products?q=kab', $this->key);
+        $page = $this->api($this->client, 'GET', '/api/products?q=kabl', $this->key);
 
         self::assertResponseIsSuccessful();
         self::assertSame(1, $page['total']);
@@ -43,7 +43,7 @@ final class ProductApiTest extends WebTestCase
         ]], $page['items']);
 
         // Polish letters as they are in the raw response, not as \u017b
-        $this->api($this->client, 'GET', '/api/products?q=%C5%BCar', $this->key);
+        $this->api($this->client, 'GET', '/api/products?q=zarowka', $this->key);
         self::assertStringContainsString('"name":"Żarówka LED"', (string) $this->client->getResponse()->getContent());
     }
 
