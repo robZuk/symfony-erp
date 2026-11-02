@@ -97,7 +97,7 @@ backup:
     keepDays: 7
     size: 2Gi
 
-# Prometheus, Grafana and two exporters. About 350 MB of memory and 1 GB of disk together, so off by default;
+# Prometheus, Grafana and two exporters. About 400 MB of memory (plus page cache) and 1 GB of disk together, so off by default;
 # CPU limits, because a monitoring tool must not take the only CPU away from the app it watches.
 monitoring:
     enabled: false
@@ -117,15 +117,16 @@ monitoring:
                 memory: 256Mi
     grafana:
         image: grafana/grafana:13.3.0
-        # Measured on k3d: killed at 224 MiB while starting
+        # The limit also covers the page cache of its 490 MB binary. At 400 MiB on production the binary was
+        # read from disk again and again (17 GB in 5 minutes) and Grafana never finished starting
         goMemLimit: 320MiB
         resources:
             requests:
                 cpu: 25m
-                memory: 192Mi
+                memory: 256Mi
             limits:
                 cpu: 300m
-                memory: 400Mi
+                memory: 768Mi
     exporters:
         postgresImage: prometheuscommunity/postgres-exporter:v0.20.1
         redisImage: oliver006/redis_exporter:v1.96.0
