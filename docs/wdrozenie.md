@@ -226,6 +226,30 @@ Argo CD nie zarządza sam sobą ani Sealed Secrets. Oba zainstalowano przez Helm
 
 Zużycie zasobów po uruchomieniu wszystkiego: ok. 1,7 GB pamięci z 4 GB (k3s ok. 0,6 GB, Argo CD ok. 0,35 GB, aplikacja ok. 0,3 GB, reszta to pozostałe aplikacje serwera).
 
+## Monitoring
+
+Prometheus zbiera metryki co 30 s i trzyma je 7 dni (najwyżej 700 MB). Grafana pokazuje je na gotowym dashboardzie „System ERP”. Całość włącza `monitoring.enabled` w chartcie, a pliki to `templates/monitoring-*.yaml` oraz `files/`.
+
+| Źródło | Co mówi |
+|---|---|
+| Traefik | liczba żądań, kody odpowiedzi, czas odpowiedzi |
+| FrankenPHP (port 2112 podów web, poza Ingressem) | zajęte workery PHP, żądania czekające na workera |
+| RabbitMQ (wbudowana wtyczka) | komunikaty w kolejkach |
+| postgres-exporter, redis_exporter | połączenia, wiersze outboksu, pamięć Redisa |
+| cAdvisor (kubelet) | CPU i pamięć każdego kontenera |
+
+Grafana nie jest wystawiona do internetu i działa bez logowania, tylko do odczytu. Otwiera się ją tunelem SSH, a potem przeglądarką pod adresem http://localhost:3000:
+
+```bash
+ssh -p 10250 -L 3000:127.0.0.1:3000 root@eve250.mikrus.xyz kubectl -n system-erp port-forward svc/system-erp-grafana 3000:3000
+```
+
+Reguły alertów są w `files/prometheus-alerts.yml`. Alerty widać na stronie Alerts w Prometheusie (`svc/system-erp-prometheus`, port 9090, tym samym sposobem). Nie są nigdzie wysyłane, bo wymagałoby to Alertmanagera.
+
+Aplikacje Dockera na tym serwerze (Planista, Ewidencja Środków Trwałych) nie są monitorowane. Metryk całego węzła też nie ma, bo w kontenerze LXC pokazywałyby współdzielonego hosta.
+
+Na k3d zestaw zajmował około 310 MB pamięci (Grafana 257 MB, Prometheus 39 MB, eksportery 14 MB). Pamięć Prometheusa rośnie wraz z danymi, do limitu 256 MB.
+
 ## Diagnostyka
 
 | Objaw | Gdzie patrzeć |

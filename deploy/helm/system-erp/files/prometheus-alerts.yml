@@ -1,0 +1,54 @@
+# Shown on the Alerts page of Prometheus and in Grafana. No messages are sent: that would need Alertmanager.
+groups:
+  - name: system-erp
+    rules:
+      - alert: WebDown
+        # One expression for "pods answer with errors" and "no pods at all": two branches would have
+        # different labels, and switching between them would restart the "for" countdown
+        expr: absent(up{job="web"} == 1)
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: No web pod answers
+      - alert: ServiceDown
+        expr: pg_up == 0 or redis_up == 0 or up{job="rabbitmq"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} does not answer"
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(traefik_service_requests_total{service=~".*system-erp-web.*", code=~"5.."}[5m]))
+            / sum(rate(traefik_service_requests_total{service=~".*system-erp-web.*"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5% of requests end with a 5xx error
+      - alert: SlowResponses
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(traefik_service_request_duration_seconds_bucket{service=~".*system-erp-web.*"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 95% of requests take longer than 1 s
+      - alert: ContainerNearMemoryLimit
+        expr: |
+          container_memory_working_set_bytes
+            / on (namespace, pod, container) (container_spec_memory_limit_bytes > 0) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.pod }}/{{ $labels.container }} uses over 90% of its memory limit"
+      - alert: QueueBacklog
+        expr: rabbitmq_queue_messages > 1000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 1000 messages wait in queue {{ $labels.queue }}"
