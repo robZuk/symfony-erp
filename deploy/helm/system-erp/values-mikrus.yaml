@@ -16,5 +16,6 @@ ingress:
         # this middleware from deploy/mikrus/https.yaml corrects it (<namespace>-<name>@kubernetescrd)
         traefik.ingress.kubernetes.io/router.middlewares: system-erp-mikrus-https@kubernetescrd
 
+# Off: Grafana 13 took the site down on 2026-11-02 (docs/wdrozenie.md, section Monitoring)
 monitoring:
-    enabled: true
+    enabled: false
