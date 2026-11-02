@@ -29,8 +29,7 @@ class ProductRepository extends ServiceEntityRepository
     }
 
     /**
-     * Saves the product and, in the same transaction, queues ProductChanged in the outbox,
-     * which brings the search index up to date (App\Catalog\Message\IndexProduct).
+     * Saves the product and, in the same transaction, queues ProductChanged in the outbox.
      */
     public function save(Product $product): void
     {
@@ -63,9 +62,7 @@ class ProductRepository extends ServiceEntityRepository
     }
 
     /**
-     * The product list straight from the database: always up to date, sorted by name.
-     * Searching by words goes through Elasticsearch (App\Catalog\Search\ProductSearch);
-     * this is also its fallback when Elasticsearch cannot be reached.
+     * The product list, sorted by name; words narrow it to a fragment of the name or the SKU.
      *
      * @return Page<Product>
      */
@@ -88,26 +85,7 @@ class ProductRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param list<int> $ids
-     *
-     * @return list<Product> the products that still exist, in the order of the given ids
-     */
-    public function findInOrder(array $ids): array
-    {
-        if ([] === $ids) {
-            return [];
-        }
-
-        $byId = [];
-        foreach ($this->findBy(['id' => $ids]) as $product) {
-            $byId[(int) $product->getId()] = $product;
-        }
-
-        return array_values(array_filter(array_map(static fn (int $id): ?Product => $byId[$id] ?? null, $ids)));
-    }
-
-    /**
-     * Every product, read in batches; for rebuilding the search index.
+     * Every product, read in batches; for the price list export.
      *
      * @return iterable<Product>
      */

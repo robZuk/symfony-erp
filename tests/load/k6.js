@@ -18,7 +18,7 @@ export const options = {
     scenarios: {
         // Staff in the browser: server-rendered pages, a session in Redis
         browse: { executor: 'constant-vus', vus: VUS, duration: DURATION, exec: 'browse' },
-        // The shop searching the catalog: Elasticsearch behind the API
+        // The shop searching the catalog through the API
         api_search: { executor: 'constant-vus', vus: VUS, duration: DURATION, exec: 'apiSearch' },
         // The shop placing orders: a transaction, a lock, the outbox
         api_orders: { executor: 'constant-arrival-rate', rate: 5, timeUnit: '1s', duration: DURATION, preAllocatedVUs: 5, exec: 'apiOrders' },

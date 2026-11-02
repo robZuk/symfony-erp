@@ -11,7 +11,7 @@ Co zostało zmierzone, co z tego wynikło i jak powtórzyć pomiar. Zasada: najp
 | Scenariusz | Obciążenie | Co sprawdza |
 |---|---|---|
 | `browse` | 10 osób w przeglądarce bez przerw | logowanie, pulpit, lista produktów, lista zamówień (Twig, sesja w Redisie) |
-| `api_search` | 10 wątków sklepu bez przerw | `GET /api/products?q=…` z losową frazą (Elasticsearch) |
+| `api_search` | 10 wątków sklepu bez przerw | `GET /api/products?q=…` z losową frazą (w czasie pomiarów przez Elasticsearch, później usunięty z projektu) |
 | `api_orders` | 5 zamówień na sekundę | `POST /api/orders` (transakcja, blokada, rezerwacja, outbox) |
 
 - Jeden komputer (12 rdzeni) obsługuje aplikację, bazę, Redisa, RabbitMQ, Elasticsearch i samo k6. Liczby bezwzględne są więc przybliżone, ale porównania między wariantami są uczciwe, bo warunki są te same.

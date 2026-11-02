@@ -7,7 +7,6 @@ use App\Catalog\Entity\Product;
 use App\Catalog\Entity\ProductKind;
 use App\Catalog\Form\ProductType;
 use App\Catalog\Repository\ProductRepository;
-use App\Catalog\Search\ProductFinder;
 use App\Shared\Tax\VatRate;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,14 +24,11 @@ final class ProductController extends AbstractController
     }
 
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(ProductFinder $finder, #[MapQueryString] ProductFilter $filter = new ProductFilter()): Response
+    public function index(#[MapQueryString] ProductFilter $filter = new ProductFilter()): Response
     {
-        $list = $finder->find($filter);
-
         return $this->render('catalog/product/index.html.twig', [
             'filter' => $filter,
-            'list' => $list,
-            'page' => $list->page,
+            'page' => $this->products->search($filter),
             'kinds' => ProductKind::cases(),
             'vat_rates' => VatRate::cases(),
         ]);

@@ -5,7 +5,6 @@ namespace App\Tests\Catalog;
 use App\Identity\Entity\ApiScope;
 use App\Tests\Support\CallsApi;
 use App\Tests\Support\CreatesRecords;
-use App\Tests\Support\IndexesProducts;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -13,7 +12,6 @@ final class ProductApiTest extends WebTestCase
 {
     use CallsApi;
     use CreatesRecords;
-    use IndexesProducts;
 
     private KernelBrowser $client;
     private string $key;
@@ -28,9 +26,8 @@ final class ProductApiTest extends WebTestCase
     {
         $this->createProduct('KAB-1', 'Kabel HDMI', netPrice: 3490);
         $this->createProduct('ZAR-1', 'Żarówka LED');
-        $this->indexProducts();
 
-        $page = $this->api($this->client, 'GET', '/api/products?q=kabl', $this->key);
+        $page = $this->api($this->client, 'GET', '/api/products?q=kab', $this->key);
 
         self::assertResponseIsSuccessful();
         self::assertSame(1, $page['total']);
@@ -46,7 +43,7 @@ final class ProductApiTest extends WebTestCase
         ]], $page['items']);
 
         // Polish letters as they are in the raw response, not as \u017b
-        $this->api($this->client, 'GET', '/api/products?q=zarowka', $this->key);
+        $this->api($this->client, 'GET', '/api/products?q=%C5%BCar', $this->key);
         self::assertStringContainsString('"name":"Żarówka LED"', (string) $this->client->getResponse()->getContent());
     }
 

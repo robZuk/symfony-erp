@@ -15,10 +15,6 @@ services:
       - "5672"
       - "15672"
 
-  elasticsearch:
-    ports:
-      - "9200"
-
 ###> symfony/mailer ###
   mailer:
     image: axllent/mailpit

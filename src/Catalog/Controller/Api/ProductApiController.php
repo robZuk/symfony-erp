@@ -6,7 +6,6 @@ use App\Catalog\Api\ProductResource;
 use App\Catalog\Dto\ProductFilter;
 use App\Catalog\Entity\Product;
 use App\Catalog\Repository\ProductRepository;
-use App\Catalog\Search\ProductFinder;
 use App\Shared\Api\ApiController;
 use App\Shared\Api\PageResource;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -17,8 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Product catalog for other systems. The same search as the product list on screen: words go
- * through Elasticsearch, and the database answers when it is down.
+ * Product catalog for other systems. The same search as the product list on screen.
  */
 #[Route('/api/products', name: 'api_product_', format: 'json')]
 #[IsGranted('ROLE_API_CATALOG_READ')]
@@ -26,7 +24,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ProductApiController extends ApiController
 {
     #[Route('', name: 'index', methods: ['GET'])]
-    #[OA\Get(summary: 'Lista produktów, z wyszukiwaniem po nazwie lub indeksie', description: 'Domyślnie tylko aktywne. Fraza w `q` wybacza literówki i pominięte polskie znaki. Stronami po 20.')]
+    #[OA\Get(summary: 'Lista produktów, z wyszukiwaniem po nazwie lub indeksie', description: 'Domyślnie tylko aktywne. Fraza w `q` to fragment nazwy lub indeksu, bez względu na wielkość liter. Stronami po 20.')]
     #[OA\Response(response: 200, description: 'Jedna strona produktów', content: new OA\JsonContent(properties: [
         new OA\Property(property: 'items', type: 'array', items: new OA\Items(ref: new Model(type: ProductResource::class))),
         new OA\Property(property: 'page', type: 'integer', example: 1),
@@ -34,9 +32,9 @@ final class ProductApiController extends ApiController
         new OA\Property(property: 'total', type: 'integer', example: 42),
     ]))]
     #[OA\Response(response: 422, description: 'Błędny parametr, np. page=0')]
-    public function index(ProductFinder $finder, #[MapQueryString(validationFailedStatusCode: 422)] ProductFilter $filter = new ProductFilter()): JsonResponse
+    public function index(ProductRepository $products, #[MapQueryString(validationFailedStatusCode: 422)] ProductFilter $filter = new ProductFilter()): JsonResponse
     {
-        return $this->respond(PageResource::of($finder->find($filter)->page, ProductResource::of(...)));
+        return $this->respond(PageResource::of($products->search($filter), ProductResource::of(...)));
     }
 
     #[Route('/{sku}', name: 'show', methods: ['GET'], requirements: ['sku' => '[A-Za-z0-9._\/-]+'])]

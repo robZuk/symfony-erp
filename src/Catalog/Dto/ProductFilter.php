@@ -48,14 +48,6 @@ final class ProductFilter
     }
 
     /**
-     * Words to search for; an empty string means the plain list.
-     */
-    public function searchTerm(): string
-    {
-        return trim($this->q);
-    }
-
-    /**
      * @return list<string>
      */
     public static function kinds(): array
