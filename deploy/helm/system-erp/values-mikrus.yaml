@@ -15,8 +15,3 @@ ingress:
         # The Mikrus proxy reports X-Forwarded-Proto: http even for HTTPS visitors;
         # this middleware from deploy/mikrus/https.yaml corrects it (<namespace>-<name>@kubernetescrd)
         traefik.ingress.kubernetes.io/router.middlewares: system-erp-mikrus-https@kubernetescrd
-
-# Off for now: on the single CPU of this server Elasticsearch took longer to start than its liveness
-# probe allowed, restarted in a loop and starved everything else (docs/wdrozenie.md). Search uses PostgreSQL.
-elasticsearch:
-    enabled: false
