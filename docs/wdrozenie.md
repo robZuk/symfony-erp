@@ -228,6 +228,8 @@ Zużycie zasobów po uruchomieniu wszystkiego: ok. 1,7 GB pamięci z 4 GB (k3s o
 
 ## Monitoring
 
+**Na produkcji monitoring jest wyłączony** (`monitoring.enabled: false` w `values-mikrus.yaml`). Działa na k3d. Podczas wdrożenia 2 listopada 2026 Grafana 13 z limitem 400 MiB nie mogła wystartować i wielokrotnie wczytywała z dysku swój plik wykonywalny o rozmiarze 490 MB (około 17 GB w 5 minut). Od około 20:11 strona zwalniała do 10 s, a od około 20:18 do około 20:24 zwracała 404. Traefik się restartował, a API klastra miewało timeouty. Po zatrzymaniu Grafany serwer wrócił do normy. Poprawka limitu nie dotarła do Grafany: sync z nią wystartował, ale nie zdążył jej zaktualizować przed przerwaniem. Dysk hosta jest obciążony także bez Grafany, więc to najbardziej prawdopodobna przyczyna, a nie udowodniona. Próba na k3d z szybkim dyskiem tego nie wykryła.
+
 Prometheus zbiera metryki co 30 s i trzyma je 7 dni (najwyżej 700 MB). Grafana pokazuje je na gotowym dashboardzie „System ERP”. Całość włącza `monitoring.enabled` w chartcie, a pliki to `templates/monitoring-*.yaml` oraz `files/`.
 
 | Źródło | Co mówi |
@@ -248,7 +250,7 @@ Reguły alertów są w `files/prometheus-alerts.yml`. Alerty widać na stronie A
 
 Aplikacje Dockera na tym serwerze (Planista, Ewidencja Środków Trwałych) nie są monitorowane. Metryk całego węzła też nie ma, bo w kontenerze LXC pokazywałyby współdzielonego hosta.
 
-Na k3d zestaw zajmował około 310 MB pamięci (Grafana 257 MB, Prometheus 39 MB, eksportery 14 MB). Pamięć Prometheusa rośnie wraz z danymi, do limitu 256 MB.
+Na k3d zestaw zajmował około 310 MB pamięci (Grafana 257 MB, Prometheus 39 MB, eksportery 14 MB). Na produkcji Prometheus zajmował około 70 MB i nie sprawiał problemów. Limit Prometheusa to 256 MB.
 
 ## Diagnostyka
 
