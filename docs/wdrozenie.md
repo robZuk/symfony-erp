@@ -80,7 +80,7 @@ Przykład: przeniesienie sesji i cache do Redisa.
 1. Na serwerze nowy SealedSecret z `REDIS_PASSWORD` i `RABBITMQ_PASSWORD` (sekcja [Hasła](#hasła-sealed-secrets)). Bez niego pody nie wystartują.
 2. Merge gałęzi `feature/redis-rabbitmq`. Argo CD stawia Redisa i RabbitMQ, stary obraz dalej działa na tabelach `sessions` i `cache_items`.
 3. Zmiana `image.tag` na nowy obraz. Nowe pody korzystają z Redisa. Przy przejściu wszyscy zostają raz wylogowani, bo sesje z PostgreSQL nie są przenoszone.
-4. Dopiero gdy nie działa już żaden pod ze starym obrazem: merge gałęzi `feature/drop-session-tables`, której migracja usuwa obie tabele. Razem z nią znika `schema_filter` w `config/packages/doctrine.yaml`, który do tego czasu ukrywa obie tabele przed `make:migration`, żeby żadna inna migracja nie usunęła ich za wcześnie.
+4. Dopiero gdy nie działa już żaden pod ze starym obrazem: migracja usuwa obie tabele. Razem z nią znika `schema_filter` w `config/packages/doctrine.yaml`, który do tego czasu ukrywał je przed `make:migration`, żeby żadna inna migracja nie usunęła ich za wcześnie.
 
 ### Elasticsearch na tym serwerze: incydenty z 30–31 października 2026
 
