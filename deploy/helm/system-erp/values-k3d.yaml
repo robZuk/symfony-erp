@@ -7,3 +7,6 @@ image:
     pullPolicy: Never
 
 host: system-erp.localhost
+
+monitoring:
+    enabled: true

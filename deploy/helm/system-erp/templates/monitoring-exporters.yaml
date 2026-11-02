@@ -1,0 +1,86 @@
+{{- if .Values.monitoring.enabled }}
+{{- $component := dict "component" "exporters" "Release" .Release -}}
+# PostgreSQL and Redis do not serve Prometheus metrics themselves; these two small programs translate.
+# A pod of their own instead of sidecars: adding them or updating them never restarts the database.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-exporters
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: exporters
+spec:
+  selector:
+    {{- include "system-erp.selector" $component | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 9187
+      targetPort: postgres
+    - name: redis
+      port: 9121
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-exporters
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: exporters
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "system-erp.selector" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "system-erp.selector" $component | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: postgres-exporter
+          image: {{ .Values.monitoring.exporters.postgresImage }}
+          ports:
+            - name: postgres
+              containerPort: 9187
+          env:
+            - name: DATA_SOURCE_URI
+              value: "{{ include "system-erp.postgresHost" . }}:5432/{{ .Values.postgres.database }}?sslmode=disable"
+            - name: DATA_SOURCE_USER
+              value: {{ .Values.postgres.user }}
+            - name: DATA_SOURCE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: POSTGRES_PASSWORD
+          resources:
+            {{- toYaml .Values.monitoring.exporters.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+        - name: redis-exporter
+          image: {{ .Values.monitoring.exporters.redisImage }}
+          ports:
+            - name: redis
+              containerPort: 9121
+          env:
+            - name: REDIS_ADDR
+              value: "redis://{{ include "system-erp.redisHost" . }}:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: REDIS_PASSWORD
+          resources:
+            {{- toYaml .Values.monitoring.exporters.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+{{- end }}

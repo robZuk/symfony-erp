@@ -38,12 +38,27 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            {{- if .Values.monitoring.enabled }}
+            - name: metrics
+              containerPort: 2112
+            {{- end }}
           env:
             {{- include "system-erp.appEnv" . | nindent 12 }}
             # A fixed number of PHP workers, each a copy of the application in memory: FrankenPHP would
             # otherwise start two per CPU core it sees, and in a container that is the whole node's
             - name: FRANKENPHP_CONFIG
               value: "worker ./public/index.php {{ .Values.web.phpWorkers }}"
+            {{- if .Values.monitoring.enabled }}
+            # Turns on the metrics of PHP workers and requests. They are served on a port of their own,
+            # which the Service below does not expose, so the Ingress never makes them public
+            - name: CADDY_GLOBAL_OPTIONS
+              value: metrics
+            - name: CADDY_EXTRA_CONFIG
+              value: |
+                :2112 {
+                    metrics
+                }
+            {{- end }}
           # The login page is public and touches PHP, Twig and the session table:
           # if it answers, the app works
           # Generous timeouts: on the single CPU of the production server a busy moment (another pod

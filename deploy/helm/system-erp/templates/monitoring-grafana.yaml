@@ -1,0 +1,152 @@
+{{- if .Values.monitoring.enabled }}
+{{- $component := dict "component" "grafana" "Release" .Release -}}
+# Grafana keeps nothing of its own: the data source and the dashboard come from these ConfigMaps, so an
+# empty disk at every start is fine. No Ingress: it is reached only through a tunnel, so nobody can get
+# to it without SSH access to the server and it needs no password (see docs/wdrozenie.md).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-grafana
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://{{ .Release.Name }}-prometheus:9090
+        isDefault: true
+        editable: false
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: system-erp
+        type: file
+        allowUiUpdates: false
+        options:
+          path: /etc/grafana/dashboards
+  system-erp.json: |
+{{ .Files.Get "files/grafana-dashboard.json" | indent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-grafana
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  selector:
+    {{- include "system-erp.selector" $component | nindent 4 }}
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-grafana
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "system-erp.selector" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "system-erp.selector" $component | nindent 8 }}
+      annotations:
+        checksum/dashboard: {{ .Files.Get "files/grafana-dashboard.json" | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: {{ .Values.monitoring.grafana.image }}
+          env:
+            # Opens straight on the dashboard, read-only, without logging in; Explore stays available
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: Viewer
+            - name: GF_USERS_VIEWERS_CAN_EDIT
+              value: "true"
+            # The built-in admin account has no way in: no login form, no password over the API
+            - name: GF_AUTH_DISABLE_LOGIN_FORM
+              value: "true"
+            - name: GF_AUTH_BASIC_ENABLED
+              value: "false"
+            - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
+              value: /etc/grafana/dashboards/system-erp.json
+            # Nothing is downloaded or reported at start, which also makes the start faster
+            - name: GF_PLUGINS_PREINSTALL_DISABLED
+              value: "true"
+            - name: GF_ANALYTICS_REPORTING_ENABLED
+              value: "false"
+            - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+              value: "false"
+            - name: GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES
+              value: "false"
+            - name: GOMEMLIMIT
+              value: {{ .Values.monitoring.grafana.goMemLimit }}
+          ports:
+            - name: http
+              containerPort: 3000
+          # The first start creates its database and takes a while on one CPU
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.monitoring.grafana.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/grafana
+            - name: config
+              mountPath: /etc/grafana/provisioning/datasources/datasource.yaml
+              subPath: datasource.yaml
+            - name: config
+              mountPath: /etc/grafana/provisioning/dashboards/dashboards.yaml
+              subPath: dashboards.yaml
+            - name: config
+              mountPath: /etc/grafana/dashboards/system-erp.json
+              subPath: system-erp.json
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-grafana
+{{- end }}
