@@ -3,7 +3,7 @@
 image:
     # The image CI built from this commit; a fixed tag, so the cluster runs a known version
     # Always in quotes: a commit hash of digits alone would otherwise be read as a number
-    tag: "1224051"
+    tag: "71a112d"
     pullPolicy: IfNotPresent
 
 host: systemerp.tojest.dev
