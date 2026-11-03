@@ -491,7 +491,7 @@ Testy sprawdzają reguły tak, jak używa ich wywołujący: żądaniem HTTP albo
 | SOAP | PHP `SoapClient`, VIES `checkVatService` | weryfikacja VAT-UE kontrahentów |
 | Poczta | Symfony Mailer, Mailpit (lokalnie) | wysyłka i podgląd maili |
 | Jakość | PHPUnit 13, PHPStan 2 (poziom 8), Deptrac, PHP-CS-Fixer, GitHub Actions | testy, analiza statyczna, granice modułów, CI |
-| Monitoring | Prometheus, Grafana, postgres-exporter, redis_exporter | metryki, dashboard, reguły alertów |
+| Monitoring | Prometheus (lokalnie pełny, na produkcji w trybie agent), Grafana / Grafana Cloud, postgres-exporter, redis_exporter | metryki, dashboard, reguły alertów |
 | Wdrożenie | Docker (FrankenPHP), Kubernetes (k3s), Helm, Argo CD, Sealed Secrets, Traefik, GitHub Container Registry | obraz, klaster, GitOps, zaszyfrowane hasła, ruch HTTP |
 
 Komponenty Twig z [Symfony UX Toolkit](https://ux.symfony.com/toolkit) odwzorowują wygląd shadcn/ui i są częścią projektu. Kolejne dodaje `symfony console ux:install <komponent> --kit shadcn`.

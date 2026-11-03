@@ -228,9 +228,15 @@ Zużycie zasobów po uruchomieniu wszystkiego: ok. 1,7 GB pamięci z 4 GB (k3s o
 
 ## Monitoring
 
-**Na produkcji monitoring jest wyłączony** (`monitoring.enabled: false` w `values-mikrus.yaml`). Działa na k3d. Podczas wdrożenia 2 listopada 2026 Grafana 13 z limitem 400 MiB nie mogła wystartować i wielokrotnie wczytywała z dysku swój plik wykonywalny o rozmiarze 490 MB (około 17 GB w 5 minut). Od około 20:11 strona zwalniała do 10 s, a od około 20:18 do około 20:24 zwracała 404. Traefik się restartował, a API klastra miewało timeouty. Po zatrzymaniu Grafany serwer wrócił do normy. Poprawka limitu nie dotarła do Grafany: sync z nią wystartował, ale nie zdążył jej zaktualizować przed przerwaniem. Dysk hosta jest obciążony także bez Grafany, więc to najbardziej prawdopodobna przyczyna, a nie udowodniona. Próba na k3d z szybkim dyskiem tego nie wykryła.
+Chart ma dwa tryby monitoringu (`monitoring.enabled`):
 
-Prometheus zbiera metryki co 30 s i trzyma je 7 dni (najwyżej 700 MB). Grafana pokazuje je na gotowym dashboardzie „System ERP”. Całość włącza `monitoring.enabled` w chartcie, a pliki to `templates/monitoring-*.yaml` oraz `files/`.
+| | Lokalnie (k3d) | Produkcja (`monitoring.grafanaCloud.enabled`) |
+|---|---|---|
+| Zbieranie metryk co 30 s | Prometheus | Prometheus w trybie agent (`--agent`) |
+| Przechowywanie, zapytania, alerty | ten sam Prometheus, 7 dni | Grafana Cloud, plan darmowy (10 tys. serii, 14 dni) |
+| Dashboard | Grafana w klastrze | Grafana Cloud |
+
+Na produkcji monitoring działa poza serwerem aplikacji. Nie zabiera jej zasobów, a alert o awarii serwera i tak przychodzi. Na serwerze zostają tylko agent (około 40 MB) i dwa eksportery (około 15 MB). Agent wysyła wyłącznie metryki z listy `monitoring.grafanaCloud.sentMetrics`, czyli te, których używają dashboard i reguły: na k3d było to 128 serii. Połączenie wychodzi z serwera (`remote_write`), więc żaden port nie jest otwierany.
 
 | Źródło | Co mówi |
 |---|---|
@@ -240,17 +246,25 @@ Prometheus zbiera metryki co 30 s i trzyma je 7 dni (najwyżej 700 MB). Grafana 
 | postgres-exporter, redis_exporter | połączenia, wiersze outboksu, pamięć Redisa |
 | cAdvisor (kubelet) | CPU i pamięć każdego kontenera |
 
-Grafana nie jest wystawiona do internetu i działa bez logowania, tylko do odczytu. Otwiera się ją tunelem SSH, a potem przeglądarką pod adresem http://localhost:3000:
+Pliki: `templates/monitoring-*.yaml`, `templates/_monitoring.tpl` (wspólna lista celów), `files/grafana-dashboard.json` (dashboard z wyborem źródła danych, działa lokalnie i w chmurze), `files/prometheus-alerts.yml` (reguły).
 
-```bash
-ssh -p 10250 -L 3000:127.0.0.1:3000 root@eve250.mikrus.xyz kubectl -n system-erp port-forward svc/system-erp-grafana 3000:3000
-```
+Lokalnie Grafanę otwiera się przez `kubectl -n system-erp port-forward svc/system-erp-grafana 3000:3000`, pod adresem http://localhost:3000, bez logowania i tylko do odczytu.
 
-Reguły alertów są w `files/prometheus-alerts.yml`. Alerty widać na stronie Alerts w Prometheusie (`svc/system-erp-prometheus`, port 9090, tym samym sposobem). Nie są nigdzie wysyłane, bo wymagałoby to Alertmanagera.
+### Grafana Cloud na produkcji
 
-Aplikacje Dockera na tym serwerze (Planista, Ewidencja Środków Trwałych) nie są monitorowane. Metryk całego węzła też nie ma, bo w kontenerze LXC pokazywałyby współdzielonego hosta.
+1. W stacku Grafana Cloud, na kafelku Prometheus (Details), są adres Remote Write i Username. Trafiają do `monitoring.grafanaCloud` w `values-mikrus.yaml`, bo nie są tajne.
+2. Token (Access Policy z uprawnieniem `metrics:write`) trafia do SealedSecretu `deploy/mikrus/grafana-cloud-secret.yaml`. Plik tworzy się na serwerze, a token wkleja w `read -rs`, więc nie trafia ani na ekran, ani do historii:
+   ```bash
+   export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+   read -rs TOKEN
+   kubectl create secret generic grafana-cloud -n system-erp --from-literal=token="$TOKEN" \
+     --dry-run=client -o yaml | kubeseal --format yaml > /root/grafana-cloud-secret.yaml; unset TOKEN
+   ```
+3. Dashboard importuje się z `files/grafana-dashboard.json` (Dashboards → New → Import), a reguły alertów z `files/prometheus-alerts.yml`.
 
-Na k3d zestaw zajmował około 310 MB pamięci (Grafana 257 MB, Prometheus 39 MB, eksportery 14 MB). Na produkcji Prometheus zajmował około 70 MB i nie sprawiał problemów. Limit Prometheusa to 256 MB.
+### Awaria z 2 listopada 2026
+
+Pierwsza wersja uruchamiała na serwerze także pełnego Prometheusa i Grafanę. Podczas wdrożenia 2 listopada 2026 Grafana 13 z limitem 400 MiB nie mogła wystartować i wielokrotnie wczytywała z dysku swój plik wykonywalny o rozmiarze 490 MB (około 17 GB w 5 minut). Od około 20:11 strona zwalniała do 10 s, a od około 20:18 do około 20:24 zwracała 404. Traefik się restartował, a API klastra miewało timeouty. Po zatrzymaniu Grafany serwer wrócił do normy. Poprawka limitu nie dotarła do Grafany: sync z nią wystartował, ale nie zdążył jej zaktualizować przed przerwaniem. Dysk hosta jest obciążony także bez Grafany, więc to najbardziej prawdopodobna przyczyna, a nie udowodniona. Próba na k3d z szybkim dyskiem tego nie wykryła.
 
 ## Diagnostyka
 

@@ -1,4 +1,4 @@
-{{- if .Values.monitoring.enabled }}
+{{- if and .Values.monitoring.enabled (not .Values.monitoring.grafanaCloud.enabled) }}
 {{- $component := dict "component" "grafana" "Release" .Release -}}
 # Grafana keeps nothing of its own: the data source and the dashboard come from these ConfigMaps, so an
 # empty disk at every start is fine. No Ingress: it is reached only through a tunnel, so nobody can get
