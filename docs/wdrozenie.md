@@ -260,7 +260,8 @@ Lokalnie Grafanę otwiera się przez `kubectl -n system-erp port-forward svc/sys
    kubectl create secret generic grafana-cloud -n system-erp --from-literal=token="$TOKEN" \
      --dry-run=client -o yaml | kubeseal --format yaml > /root/grafana-cloud-secret.yaml; unset TOKEN
    ```
-3. Dashboard importuje się z `files/grafana-dashboard.json` (Dashboards → New → Import), a reguły alertów z `files/prometheus-alerts.yml`.
+3. Dashboard importuje się z `files/grafana-dashboard.json` (Dashboards → New → Import, po zmianie z nadpisaniem). Grafana Cloud nie pobiera go z repozytorium, więc każdą zmianę trzeba zaimportować ręcznie.
+4. Reguły alertów importuje się z `files/prometheus-alerts.yml` (Alerting → Alert rules → import, źródło „Prometheus YAML file”, folder `System ERP`). Grafana zamienia je na własne alerty i sama je liczy. Powiadomienia idą na kontakt `grafana-default-email`, czyli na adres właściciela konta. Gdy cały serwer padnie, agent przestaje wysyłać dane i włącza się `WebDown`, bo w chmurze brakuje serii `up{job="web"}`.
 
 ### Awaria z 2 listopada 2026
 
