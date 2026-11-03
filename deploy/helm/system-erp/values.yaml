@@ -97,10 +97,36 @@ backup:
     keepDays: 7
     size: 2Gi
 
-# Prometheus, Grafana and two exporters. About 400 MB of memory (plus page cache) and 1 GB of disk together, so off by default;
-# CPU limits, because a monitoring tool must not take the only CPU away from the app it watches.
+# Prometheus, Grafana and two exporters. On their own (local clusters) about 400 MB of memory plus page
+# cache and 1 GB of disk, so off by default. With grafanaCloud only Prometheus in agent mode and the
+# exporters run here. CPU limits, because monitoring must not take the only CPU away from the app.
 monitoring:
     enabled: false
+    # Send the metrics to Grafana Cloud instead of keeping and showing them in the cluster
+    grafanaCloud:
+        enabled: false
+        # From the Prometheus tile of the Grafana Cloud stack ("Details")
+        remoteWriteUrl: ""
+        username: ""
+        # Secret with the access policy token (scope metrics:write) under the key "token"
+        existingSecret: grafana-cloud
+        cluster: ""
+        sentMetrics:
+            - up
+            - traefik_service_requests_total
+            - traefik_service_request_duration_seconds_bucket
+            - frankenphp_busy_workers
+            - frankenphp_queue_depth
+            - frankenphp_total_workers
+            - rabbitmq_queue_messages
+            - pg_up
+            - pg_stat_activity_count
+            - pg_stat_user_tables_n_live_tup
+            - redis_up
+            - redis_memory_used_bytes
+            - container_cpu_usage_seconds_total
+            - container_memory_working_set_bytes
+            - container_spec_memory_limit_bytes
     prometheus:
         image: prom/prometheus:v3.15.1
         scrapeInterval: 30s

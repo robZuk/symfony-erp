@@ -29,7 +29,7 @@
       "title": "Żądania na sekundę",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -51,7 +51,7 @@
           "legendFormat": "{{code}}",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -62,7 +62,7 @@
       "title": "Udział błędów 5xx",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -84,7 +84,7 @@
           "legendFormat": "5xx",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -95,7 +95,7 @@
       "title": "Czas odpowiedzi",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -117,7 +117,7 @@
           "legendFormat": "mediana",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         },
         {
@@ -126,7 +126,7 @@
           "legendFormat": "p95",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         },
         {
@@ -135,7 +135,7 @@
           "legendFormat": "p99",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -157,7 +157,7 @@
       "title": "Zajęte workery PHP",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -179,7 +179,7 @@
           "legendFormat": "{{pod}}",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ],
@@ -191,7 +191,7 @@
       "title": "Żądania czekające na workera",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -213,7 +213,7 @@
           "legendFormat": "{{pod}}",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -224,7 +224,7 @@
       "title": "Komunikaty w kolejce RabbitMQ",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -246,7 +246,7 @@
           "legendFormat": "{{queue}}",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -268,7 +268,7 @@
       "title": "PostgreSQL: połączenia",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -290,7 +290,7 @@
           "legendFormat": "połączenia",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -301,7 +301,7 @@
       "title": "PostgreSQL: wiersze w outboksie",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -323,7 +323,7 @@
           "legendFormat": "messenger_messages",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ],
@@ -335,7 +335,7 @@
       "title": "Redis: pamięć",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -357,7 +357,7 @@
           "legendFormat": "pamięć",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -379,7 +379,7 @@
       "title": "Pamięć kontenerów",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -401,7 +401,7 @@
           "legendFormat": "{{pod}}",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ]
@@ -412,7 +412,7 @@
       "title": "CPU kontenerów",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -434,11 +434,23 @@
           "legendFormat": "{{pod}}",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${datasource}"
           }
         }
       ],
       "description": "1 = cały jeden rdzeń."
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Źródło danych",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  }
 }

@@ -1,0 +1,118 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.grafanaCloud.enabled }}
+{{- $component := dict "component" "prometheus-agent" "Release" .Release -}}
+{{- $cloud := .Values.monitoring.grafanaCloud -}}
+# Prometheus in agent mode: collects the same metrics as the full setup, keeps none of them and sends
+# them to Grafana Cloud, where they are stored, shown and checked by the alert rules. Monitoring then
+# lives off this server: it costs the app little, and an outage of the server is still noticed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-prometheus-agent
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus-agent
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ .Values.monitoring.prometheus.scrapeInterval }}
+      # Tells this server's metrics apart from others sent to the same Grafana Cloud stack
+      external_labels:
+        cluster: {{ $cloud.cluster | quote }}
+    {{- include "system-erp.scrapeConfigs" . | nindent 4 }}
+    remote_write:
+      - url: {{ required "Set monitoring.grafanaCloud.remoteWriteUrl" $cloud.remoteWriteUrl | quote }}
+        basic_auth:
+          username: {{ required "Set monitoring.grafanaCloud.username" $cloud.username | quote }}
+          password_file: /etc/grafana-cloud/token
+        # Only what the dashboard and the alert rules use: the free plan counts every series
+        write_relabel_configs:
+          - source_labels: [__name__]
+            regex: {{ $cloud.sentMetrics | join "|" | quote }}
+            action: keep
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-prometheus-agent
+  labels:
+    {{- include "system-erp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus-agent
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  # One copy at a time: two would send every sample twice
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "system-erp.selector" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "system-erp.selector" $component | nindent 8 }}
+      annotations:
+        checksum/config: {{ include "system-erp.scrapeConfigs" . | cat $cloud | toString | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+        - name: prometheus
+          image: {{ .Values.monitoring.prometheus.image }}
+          args:
+            - --agent
+            - --config.file=/etc/prometheus/prometheus.yml
+            # Samples wait here while Grafana Cloud cannot be reached. Lost with the pod, which is
+            # acceptable for monitoring and spares the server a disk of its own
+            - --storage.agent.path=/prometheus
+          env:
+            - name: GOMEMLIMIT
+              value: {{ .Values.monitoring.prometheus.goMemLimit }}
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.monitoring.prometheus.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: token
+              mountPath: /etc/grafana-cloud
+              readOnly: true
+            - name: wal
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-prometheus-agent
+        - name: token
+          secret:
+            secretName: {{ $cloud.existingSecret }}
+            items:
+              - key: token
+                path: token
+        - name: wal
+          emptyDir:
+            sizeLimit: 256Mi
+{{- end }}

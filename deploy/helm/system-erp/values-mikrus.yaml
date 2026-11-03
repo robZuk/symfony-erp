@@ -16,6 +16,13 @@ ingress:
         # this middleware from deploy/mikrus/https.yaml corrects it (<namespace>-<name>@kubernetescrd)
         traefik.ingress.kubernetes.io/router.middlewares: system-erp-mikrus-https@kubernetescrd
 
-# Off: Grafana 13 took the site down on 2026-11-02 (docs/wdrozenie.md, section Monitoring)
+# Only the Prometheus agent and the exporters run here. The full setup with Grafana took the site down on 2026-11-02
+# (docs/wdrozenie.md, section Monitoring); here only the agent runs and sends the metrics away.
 monitoring:
-    enabled: false
+    enabled: true
+    grafanaCloud:
+        enabled: true
+        # Stack in Grafana Cloud (eu-north); the token is in deploy/mikrus/grafana-cloud-secret.yaml
+        remoteWriteUrl: https://prometheus-prod-39-prod-eu-north-0.grafana.net/api/prom/push
+        username: "3731172"
+        cluster: mikrus
