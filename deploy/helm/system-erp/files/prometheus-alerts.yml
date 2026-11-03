@@ -1,4 +1,5 @@
-# Shown on the Alerts page of Prometheus and in Grafana. No messages are sent: that would need Alertmanager.
+# Locally: shown on the Alerts page of Prometheus, no messages are sent (that would need Alertmanager).
+# Production: imported into Grafana Cloud, which evaluates them and sends e-mails (docs/wdrozenie.md).
 groups:
   - name: system-erp
     rules:
