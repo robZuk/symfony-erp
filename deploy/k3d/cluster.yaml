@@ -13,3 +13,13 @@ ports:
     - port: 8088:80
       nodeFilters:
           - loadbalancer
+options:
+    k3s:
+        extraArgs:
+            # Docker hands out container IPs in start order, so after a host reboot the node can come back
+            # with a different IP than the one stored in the cluster. k3s's network policy controller then
+            # cannot find the stored IP, shuts k3s down and the container restarts in a loop. The chart
+            # defines no NetworkPolicy, so the controller has nothing to enforce here.
+            - arg: --disable-network-policy
+              nodeFilters:
+                  - server:*
