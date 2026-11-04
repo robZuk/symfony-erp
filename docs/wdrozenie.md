@@ -68,6 +68,12 @@ kubectl -n argocd describe application system-erp   # szczegóły i błędy osta
 kubectl -n system-erp get pods
 ```
 
+### Wymiana podów bez utraconych żądań
+
+Kubernetes wysyła podowi SIGTERM i wypisuje go z Service w tym samym momencie, a kube-proxy i Traefik dowiadują się o tym chwilę później. FrankenPHP kończy pracę w 0,1 s. Żądania wysłane do niego w tej chwili kończyły się błędem 502 albo wisiały bez odpowiedzi, bo adres IP podu już nie istniał. Na produkcji 3 listopada 2026 jedno takie żądanie przerwano po 12 s, a Traefik zapisał je jako 499.
+
+Pod web czeka więc 10 s przed zatrzymaniem (`lifecycle.preStop.sleep`, `web.shutdownDelaySeconds`) i przez ten czas nadal obsługuje ruch. Pomiar na k3d przy około 10 żądaniach na sekundę i `kubectl rollout restart`: bez przerwy 11–12 błędów na każdą wymianę (3 próby), z przerwą 0 błędów w 6 próbach, zarówno przez Traefika, jak i bezpośrednio przez Service. Wymiana obu podów trwa przez to około 20 s dłużej.
+
 ### Zmiany w kilku wydaniach
 
 Podczas wymiany podów przez chwilę działają obie wersje naraz, a migracje uruchamiają się, zanim powstanie pierwszy nowy pod. Do tego chart wdraża się od razu po pushu, a obraz dopiero po zmianie tagu, więc nowy chart przez kilka minut działa ze starym obrazem. Dlatego:
