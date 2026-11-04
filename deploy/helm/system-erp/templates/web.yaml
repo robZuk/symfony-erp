@@ -25,6 +25,8 @@ spec:
       labels:
         {{- include "system-erp.selector" $component | nindent 8 }}
     spec:
+      # The preStop wait of the web container (below) plus time for running requests to finish
+      terminationGracePeriodSeconds: {{ add .Values.web.shutdownDelaySeconds 20 }}
       securityContext:
         # Mounted disks become writable for the app user's group
         fsGroup: 1000
@@ -79,6 +81,14 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 10
             failureThreshold: 6
+          # Kubernetes sends SIGTERM and removes the pod from the Service at the same moment, and the
+          # change reaches kube-proxy and Traefik a moment later. FrankenPHP stops within 0.1 s, so
+          # requests sent to it in that window failed with 502 or hung until the client gave up (its IP
+          # was already gone). The pod keeps serving for these seconds before it is told to stop.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ .Values.web.shutdownDelaySeconds }}
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
           securityContext:

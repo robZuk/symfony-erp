@@ -33,6 +33,9 @@ web:
     # PHP workers per pod. Measured with k6 (docs/wydajnosc.md): 4 workers serve about 1000 requests a
     # second at about 100 MB, within the memory limit below
     phpWorkers: 4
+    # Seconds a stopping pod keeps serving, until kube-proxy and Traefik no longer send it requests
+    # (measured on k3d, docs/wdrozenie.md)
+    shutdownDelaySeconds: 10
     resources:
         requests:
             cpu: 50m
